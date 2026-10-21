@@ -44,7 +44,8 @@ def call(client: httpx.Client, method: str, path: str, **kwargs: Any) -> Any:
         response = client.request(method, path, **kwargs)
     except httpx.HTTPError as exc:
         raise ProbeError(f"Network error calling {path}: {exc.__class__.__name__}") from exc
-    print(f"  HTTP {response.status_code}  ({response.elapsed.total_seconds() * 1000:.0f} ms)")
+    response.read()
+    print(f"  HTTP {response.status_code}")
     if response.status_code == 401:
         raise ProbeError("Ring token expired or invalid, regenerate it in the Playground.")
     if response.status_code >= 400:
