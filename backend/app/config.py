@@ -19,7 +19,9 @@ def load_dotenv(path: Path | None = None) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        value = value.strip().strip('"').strip("'")
+        if value:  # an empty line in .env must not hide credentials from other sources
+            os.environ.setdefault(key.strip(), value)
 
 
 def _bool(value: str) -> bool:

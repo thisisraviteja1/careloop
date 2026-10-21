@@ -1,5 +1,6 @@
 # Secrets
 .env
+connect-report.txt
 
 # Databases
 *.db
