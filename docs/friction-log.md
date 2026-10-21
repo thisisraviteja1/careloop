@@ -35,3 +35,31 @@ Every real tooling problem, written down when it happens. Format: task, steps ta
 - **Severity:** low
 - **Workaround:** will confirm the body shape with a real token in Phase 1; plan to contribute `scripts/image_snapshot.py` upstream in Phase 8.
 - **Suggestion:** add a snapshot example (request body, `components` for multi-camera devices, and the response content type) to the sample repo.
+
+### 5. The official sample says events can't be polled, but the API has an event history endpoint
+- **Task:** decide between polling and webhooks for activity (Phase 1).
+- **Steps:** read `app/api/ring/events/route.ts` in `ring-api-helloworld`, then the endpoint table in the API docs.
+- **Expected vs. actual:** expected the sample and the docs to agree. The sample's comment says "Ring doesn't have a polling API for events - they're delivered via webhooks", while the docs list `GET /v1/history/devices/{device_id}/events`.
+- **Severity:** med (a team reading only the sample would think a webhook server with a public URL is required)
+- **Workaround:** used the event history endpoint with polling, and kept webhooks out of scope.
+- **Suggestion:** update the comment to point to the event history endpoint, and explain when to use history polling versus webhooks.
+
+### 6. No time-range or paging parameters documented for event history
+- **Task:** fetch only new events on each poll (Phase 1).
+- **Steps:** searched the docs page and the sample for `since`, `until`, `limit`, `cursor` and `page`.
+- **Expected vs. actual:** expected a way to ask for events after a timestamp, and a paging rule. Found neither, so every poll may download the whole history.
+- **Severity:** med (more data per poll, and a risk of missing events if the history is truncated)
+- **Workaround:** the client filters by timestamp after fetching, and follows JSON:API `links.next` for at most 10 pages if present.
+- **Suggestion:** document `start`/`end` (or `since`) and paging parameters, the default page size, and the maximum history window.
+
+### 7. SQLModel's newest source rejects naive datetimes
+- **Task:** store event timestamps in SQLite (Phase 1).
+- **Steps:** ran the poller tests against the latest SQLModel source.
+- **Expected vs. actual:** expected naive UTC datetimes to store as before; got `ValueError: Datetime values must have timezone information` from SQLModel's new `UTCDateTime` type.
+- **Severity:** low (not a Ring or AWS tool, but it would break a fresh install that picks up the new release)
+- **Workaround:** CareLoop declares its own `UTCDateTime` column type, so behaviour is the same on old and new SQLModel releases.
+- **Suggestion:** none for the hackathon tools; recorded because it cost time.
+
+---
+
+**Still to log by the team (needs real credentials):** the Playground token flow, the first real `make probe` run (device list, event names), Bedrock model access and inference-profile IDs (`scripts/check_bedrock.py`), the snapshot request body, and the Telegram bot setup. Write each one down as it happens, with the exact error text.
