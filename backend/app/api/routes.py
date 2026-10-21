@@ -78,7 +78,17 @@ STATUS_TEXT = {
     "escalating": ("Escalating", "🔔"),
     "degraded": ("Monitoring degraded", "🛠"),
     "learning": ("Learning routine", "📚"),
+    "away": ("Away", "🧳"),
 }
+
+
+def pick_anomaly(*candidates: Anomaly | None) -> Anomaly | None:
+    """Today's most relevant anomaly: an open one first, then the newest."""
+    present = [a for a in candidates if a is not None]
+    if not present:
+        return None
+    open_ = [a for a in present if a.state in ACTIVE]
+    return max(open_ or present, key=lambda a: a.id or 0)
 
 
 @router.get("/status")
@@ -87,14 +97,17 @@ def get_status(request: Request) -> dict[str, Any]:
     now = clock.now().astimezone(svc.tz)
     with session_scope() as session:
         result = svc.detect(session, create=False)
-        anomaly = result.anomaly
+        silence = svc.detect_silence(session, create=False)
+        anomaly = pick_anomaly(result.anomaly, silence.anomaly)
         status = result.decision.status
+        if silence.decision.status == "anomaly":
+            status = "anomaly"
         if status == "anomaly" or (anomaly and anomaly.state in ("EXHAUSTED", "DETECTED")):
             status = "unusual"
         if anomaly and anomaly.state in ACTIVE and anomaly.state != "DETECTED":
             status = "escalating"
-        if result.decision.status == "degraded":
-            status = "degraded"
+        if result.decision.status in ("degraded", "away"):
+            status = result.decision.status
         label, icon = STATUS_TEXT.get(status, STATUS_TEXT["normal"])
         last_seen = result.last_seen
         health = result.health
@@ -109,6 +122,9 @@ def get_status(request: Request) -> dict[str, Any]:
             "last_seen_text": last_seen_phrase(last_seen, now) if last_seen else None,
             "threshold_text": clock_time(result.decision.threshold_at)
             if result.decision.threshold_at else None,
+            "silence_check_text": clock_time(silence.decision.threshold_at.astimezone(svc.tz))
+            if silence.decision.status == "quiet" and silence.decision.threshold_at else None,
+            "away": result.away,
             "learning_days": min(result.baseline.history_days, MIN_HISTORY_DAYS),
             "learning_needed": MIN_HISTORY_DAYS,
             "device": {"status": health.status if health else "unknown",
@@ -274,6 +290,44 @@ def ring_health(request: Request) -> dict[str, Any]:
             client.close()
     return {"connected": True, "mode": data_source, "devices": devices,
             "message": f"Ring API connected ({devices} device{'s' if devices != 1 else ''})."}
+
+
+# ---- away mode ------------------------------------------------------------------------------
+
+class AwayBody(BaseModel):
+    start: date
+    end: date
+    note: str = ""
+
+
+def away_json(period: Any) -> dict[str, Any]:
+    return {"id": period.id, "start": period.start.isoformat(), "end": period.end.isoformat(),
+            "note": period.note}
+
+
+@router.get("/away")
+def list_away(request: Request) -> dict[str, Any]:
+    svc = service(request)
+    with session_scope() as session:
+        return {"periods": [away_json(p) for p in svc.list_away(session)],
+                "away_today": svc.is_away_today(session)}
+
+
+@router.post("/away")
+def add_away(request: Request, body: AwayBody) -> dict[str, Any]:
+    svc = service(request)
+    try:
+        period = svc.add_away(body.start, body.end, body.note)
+    except ValueError as exc:
+        raise ApiError(400, "bad_away_period", str(exc)) from exc
+    return {"ok": True, "period": away_json(period)}
+
+
+@router.delete("/away/{period_id}")
+def remove_away(request: Request, period_id: int) -> dict[str, Any]:
+    if not service(request).remove_away(period_id):
+        raise ApiError(404, "not_found", "No such away period.", {"id": period_id})
+    return {"ok": True}
 
 
 # ---- demo -------------------------------------------------------------------------------------

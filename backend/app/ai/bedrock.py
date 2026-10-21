@@ -43,10 +43,13 @@ class Bedrock:
     """Converse calls with audit logging. Pass `client` to inject a stubbed boto3 client."""
 
     def __init__(self, region: str, *, client: Any | None = None,
-                 audit: AuditFn = null_audit) -> None:
+                 audit: AuditFn = null_audit, guardrail_id: str = "",
+                 guardrail_version: str = "DRAFT") -> None:
         self.region = region
         self._client = client
         self.audit = audit
+        self.guardrail_id = guardrail_id
+        self.guardrail_version = guardrail_version or "DRAFT"
 
     @property
     def client(self) -> Any:
@@ -58,7 +61,7 @@ class Bedrock:
                       max_tokens: int = 300, temperature: float = 0.2) -> str:
         content = [{"text": prompt}]
         return self._converse(model_id, content, system, max_tokens, temperature, reason,
-                              action="bedrock.converse.text")
+                              action="bedrock.converse.text", guarded=True)
 
     def converse_image(self, model_id: str, prompt: str, image: bytes, *, reason: str,
                        max_tokens: int = 120) -> str:
@@ -71,7 +74,8 @@ class Bedrock:
                               action="bedrock.converse.image")
 
     def _converse(self, model_id: str, content: list[dict[str, Any]], system: str,
-                  max_tokens: int, temperature: float, reason: str, *, action: str) -> str:
+                  max_tokens: int, temperature: float, reason: str, *, action: str,
+                  guarded: bool = False) -> str:
         if not model_id:
             self.audit(action, reason, "skipped: no model ID configured")
             raise BedrockError("no model ID configured")
@@ -82,6 +86,11 @@ class Bedrock:
         }
         if system:
             request["system"] = [{"text": system}]
+        guardrail = guarded and bool(self.guardrail_id)
+        if guardrail:
+            request["guardrailConfig"] = {"guardrailIdentifier": self.guardrail_id,
+                                          "guardrailVersion": self.guardrail_version,
+                                          "trace": "disabled"}
         try:
             response = self.client.converse(**request)
         except Exception as exc:  # botocore raises many types; all mean "use the fallback"
@@ -89,11 +98,16 @@ class Bedrock:
             self.audit(action, reason, f"error: {code} ({model_id})")
             logger.warning("Bedrock %s failed: %s", model_id, code)
             raise BedrockError(code) from exc
+        if response.get("stopReason") == "guardrail_intervened":
+            self.audit(action, reason, f"blocked by Bedrock Guardrail ({model_id}), "
+                                       "using fallback")
+            raise BedrockError("guardrail_intervened")
         blocks = response.get("output", {}).get("message", {}).get("content", [])
         text = " ".join(b["text"] for b in blocks if isinstance(b, dict) and "text" in b).strip()
         usage = response.get("usage", {})
         outcome = (f"ok ({model_id}, {usage.get('inputTokens', '?')} in / "
-                   f"{usage.get('outputTokens', '?')} out tokens)")
+                   f"{usage.get('outputTokens', '?')} out tokens"
+                   f"{', guardrail passed' if guardrail else ''})")
         if not text:
             self.audit(action, reason, f"error: empty response ({model_id})")
             raise BedrockError("empty response")

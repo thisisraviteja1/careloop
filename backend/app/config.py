@@ -35,6 +35,8 @@ class Settings:
     aws_region: str
     bedrock_vision_model_id: str
     bedrock_text_model_id: str
+    bedrock_guardrail_id: str
+    bedrock_guardrail_version: str
     telegram_bot_token: str
     telegram_chat_elder: str
     telegram_chat_caregiver: str
@@ -66,6 +68,8 @@ def get_settings() -> Settings:
         aws_region=env("AWS_REGION", "us-east-1"),
         bedrock_vision_model_id=env("BEDROCK_VISION_MODEL_ID", ""),
         bedrock_text_model_id=env("BEDROCK_TEXT_MODEL_ID", ""),
+        bedrock_guardrail_id=env("BEDROCK_GUARDRAIL_ID", ""),
+        bedrock_guardrail_version=env("BEDROCK_GUARDRAIL_VERSION", "DRAFT"),
         telegram_bot_token=env("TELEGRAM_BOT_TOKEN", ""),
         telegram_chat_elder=env("TELEGRAM_CHAT_ELDER", ""),
         telegram_chat_caregiver=env("TELEGRAM_CHAT_CAREGIVER", ""),

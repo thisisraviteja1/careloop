@@ -171,3 +171,59 @@ def test_demo_endpoints_need_demo_mode(svc: tuple[CareLoop, FakeNotifier]) -> No
     response = client.post("/api/demo/seed")
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "demo_disabled"
+
+
+def test_long_silence_scenario(svc: tuple[CareLoop, FakeNotifier]) -> None:
+    service, fake = svc
+    service.demo_seed(28)
+    service.demo_run("long-silence")
+    run_until_done(service, max_minutes=400)
+    with session_scope() as session:
+        anomaly = session.exec(select(Anomaly)).one()
+        assert anomaly.kind == "A2" and anomaly.state == "EXHAUSTED"
+        assert anomaly.facts["last_seen_ts"].endswith("09:30:00+05:30")
+        reasons = {a.reason for a in session.exec(select(AuditLog)).all()}
+        assert {"anomaly A2 verification", "anomaly A2 escalation L1"} <= reasons
+        assert not any(r.startswith("anomaly A1") for r in reasons)
+    assert [role for role, _ in fake.sent] == ["elder", "caregiver", "neighbor"]
+    assert "since 9:30 AM today" in fake.sent[1][1]
+    assert service.demo.log[0]["text"].startswith("Scenario long-silence starts. Long-silence")
+
+
+def test_away_day_scenario(svc: tuple[CareLoop, FakeNotifier]) -> None:
+    service, fake = svc
+    service.demo_seed(28)
+    service.demo_run("away-day")
+    run_until_done(service)
+    with session_scope() as session:
+        assert session.exec(select(Anomaly)).all() == []
+    assert fake.sent == []
+    # another scenario afterwards removes the demo away period again
+    service.demo_run("missed-morning")
+    run_until_done(service)
+    with session_scope() as session:
+        assert len(session.exec(select(Anomaly)).all()) == 1
+
+
+def test_away_api(svc: tuple[CareLoop, FakeNotifier]) -> None:
+    service, _ = svc
+    client = TestClient(create_app(service.settings, start_loops=False, careloop=service))
+    client.post("/api/demo/seed")
+    today = clock.now().astimezone(IST).date().isoformat()
+    created = client.post("/api/away", json={"start": today, "end": today, "note": "Wedding"})
+    assert created.json()["ok"]
+    listing = client.get("/api/away").json()
+    assert listing["away_today"] is True and listing["periods"][0]["note"] == "Wedding"
+    assert client.get("/api/status").json()["status"] == "away"
+
+    bad = client.post("/api/away", json={"start": today, "end": "2020-01-01"})
+    assert bad.status_code == 400 and bad.json()["error"]["code"] == "bad_away_period"
+    too_long = client.post("/api/away", json={"start": "2026-01-01", "end": "2026-12-31"})
+    assert too_long.status_code == 400
+
+    period_id = listing["periods"][0]["id"]
+    assert client.delete(f"/api/away/{period_id}").json()["ok"]
+    assert client.delete(f"/api/away/{period_id}").status_code == 404
+    assert client.get("/api/status").json()["status"] != "away"
+    actions = [e["action"] for e in client.get("/api/audit").json()["entries"]]
+    assert "away.add" in actions and "away.remove" in actions

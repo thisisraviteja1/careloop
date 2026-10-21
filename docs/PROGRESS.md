@@ -120,3 +120,14 @@
 7. Optional: replace `fixtures/demo_snapshot.jpg` with a real doorstep photo (no people or faces).
 
 **Next (stretch, Phase 9):** A2 "long silence", away mode, Bedrock Guardrails.
+
+## Phase 9: stretch
+
+**Done**
+1. **A2 "long silence"** (`baseline/gaps.py`, `detection/detector.py::evaluate_silence`, `run_silence_detection`). Daytime buckets 8–12, 12–4 and 4–8 (overnight excluded). For each past day, the longest silence reaching into the bucket, counted only after the first sighting; typical = p90, alert at typical + 60 min, at most once per day, with the device health guard. Deterministic caregiver message (59 words in the demo); new `long-silence` scenario (seen 7:05 and 9:30 AM, A2 at about 4 PM on the seeded history).
+2. **Away mode** (`AwayPeriod` table, `/api/away` GET/POST/DELETE, dashboard panel). Away days raise no A1 or A2 alert and are left out of every baseline (if a weekday then has under 4 samples, the pooled fallback applies). Spans are capped at 90 days; adding and removing are audit-logged. New `away-day` scenario.
+3. **Bedrock Guardrails**: optional `BEDROCK_GUARDRAIL_ID`/`VERSION`; `guardrailConfig` on the explainer's text call; a `guardrail_intervened` stop reason falls back to the template and is audit-logged. `scripts/create_guardrail.py` creates a guardrail that denies "medical diagnosis" and blocks the forbidden words (request validated against the Bedrock API schema in tests). The local validator stays as the fallback.
+- 19 new tests (110 in total). Both new scenarios run end to end in the CLI, the API and the dashboard.
+
+**Waiting on a human**
+- Run `python scripts/create_guardrail.py` with real AWS credentials, add the IDs to `.env`, and run `scripts/check_bedrock.py` to confirm it; log anything that goes wrong in the friction log.

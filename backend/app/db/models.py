@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import JSON, Column, UniqueConstraint, types
@@ -110,3 +110,13 @@ class DeviceHealth(SQLModel, table=True):
     since: datetime | None = utc_field(optional=True)
     last_checked: datetime | None = utc_field(optional=True)
     caregiver_notified: bool = False
+
+
+class AwayPeriod(SQLModel, table=True):
+    """Days the person is away from home: no alerts, and excluded from every baseline."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    start: date = Field(index=True)
+    end: date = Field(index=True)
+    note: str = ""
+    created_at: datetime = utc_field()

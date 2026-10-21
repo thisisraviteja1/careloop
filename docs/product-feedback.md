@@ -39,7 +39,10 @@ Draft built from [`friction-log.md`](friction-log.md). Sections marked *to compl
 - botocore's `Stubber` validates requests against the real API schema in unit tests, with no network.
 - `usage` token counts in every response make cost-aware audit logging easy.
 
+- Guardrails plug into the same Converse call (`guardrailConfig`), and an intervention is a clear `stopReason`, so a deterministic fallback is easy to wire in.
+
 **What needs work**
+- *To complete:* guardrail creation and behaviour with real calls (`scripts/create_guardrail.py`).
 - *To complete:* model access requests, and whether inference-profile IDs were needed in the chosen region (`scripts/check_bedrock.py` reports both).
 
 **Would we build with it again?** *To complete after real calls.*

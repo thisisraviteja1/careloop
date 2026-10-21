@@ -98,7 +98,7 @@ class EscalationRunner:
         token = self.token_for(anomaly, action.role, started)
         results = deliver(session, self.notifiers, recipient, text, token,
                           anomaly_id=anomaly.id, kind=f"escalation {action.level}",
-                          reason=f"anomaly A1 escalation {action.level}", now=started)
+                          reason=f"anomaly {anomaly.kind} escalation {action.level}", now=started)
         outcome = "sent" if any(r.status == "sent" for r in results) else "failed"
         session.add(EscalationStep(anomaly_id=anomaly.id, level=action.level,
                                    recipient_role=action.role, started_at=to_db(started),

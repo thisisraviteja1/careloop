@@ -2,7 +2,9 @@
 
 **CareLoop notices when an older adult who lives alone misses their usual morning, using a Ring doorbell.** It learns the person's own routine (when they first appear at the front door, weekday by weekday), and if a morning passes the usual time by a clear margin, it checks one camera snapshot with an Amazon Bedrock vision model, explains in plain words why the morning looks unusual, and asks people in order: the person first, then family, then a neighbor.
 
-Statistics decide whether to alert. AI only describes the snapshot and phrases the message, and every model output is checked before anyone sees it.
+It also notices an unusually long quiet stretch later in the day (after the person was seen that morning), and alerts can be paused for days the person is away.
+
+Statistics decide whether to alert. AI only describes the snapshot and phrases the message, and every model output is checked before anyone sees it, by CareLoop's own validator and optionally by an Amazon Bedrock Guardrail.
 
 ![CareLoop dashboard during the missed-morning demo](docs/images/dashboard.png)
 
@@ -19,6 +21,8 @@ Built for the Ring track. Priority categories: **caretaking** (a calm, step-by-s
 | What family receives | "No activity" | Why it's unusual, what the camera shows, and what has been tried, in at most 70 words |
 | Who is asked | Usually family straight away | The person first (one tap), then caregiver, then neighbor; any ack stops the ladder |
 | Dead camera | Looks like a missing person, or stays silent | "Monitoring degraded since 8:05 AM", sent to the caregiver once; no false alarm |
+| Quiet afternoon | One fixed "no activity for N hours" rule | Compared with the person's own longest quiet stretches for that part of the day (8–12, 12–4, 4–8), plus 60 min |
+| Travel and visits | Turn the system off and hope someone turns it back on | Away mode for a date range: no alerts, and those days are left out of the learned routine |
 
 ### Evaluation (simulation)
 
@@ -42,17 +46,17 @@ Needs Python 3.11 or newer.
 ```bash
 git clone <this repo> && cd careloop
 make setup            # virtualenv, installs CareLoop + dev tools, creates .env from .env.example
-make test             # 91 tests, no network
+make test             # 110 tests, no network
 make demo             # open http://127.0.0.1:8000 and use the demo panel
 ```
 
-In the demo panel: **Seed 28 days of history**, then **Run missed morning**. At ×60 the whole ladder runs in about 95 seconds. The other scenarios: **late but normal** (first motion at 7:40, no alert), **elder replies** (simulated tap on "I'm OK", the ladder stops), and **camera offline** (degraded notice, no false alarm).
+In the demo panel: **Seed 28 days of history**, then **Run missed morning**. At ×60 the whole ladder runs in about 95 seconds. The other scenarios: **late but normal** (first motion at 7:40, no alert), **elder replies** (simulated tap on "I'm OK", the ladder stops), **camera offline** (degraded notice, no false alarm), **long silence** (seen at 7:05 and 9:30 AM, then nothing until the afternoon check), and **away day** (away mode on, no alert).
 
 The same scenarios run in the terminal with `make demo-cli SCENARIO=missed-morning`.
 
 Without AWS or Telegram settings, the demo still runs end to end: the camera line says "camera image unavailable", the message comes from the deterministic template, and messages appear on the dashboard only. To see the real thing:
 
-1. **Bedrock:** set `AWS_REGION`, `BEDROCK_VISION_MODEL_ID` and `BEDROCK_TEXT_MODEL_ID` in `.env`, run `aws configure`, then `python scripts/check_bedrock.py` (it lists the models and inference profiles in your region and tells you what to fix) and `python scripts/try_explainer.py`.
+1. **Bedrock:** set `AWS_REGION`, `BEDROCK_VISION_MODEL_ID` and `BEDROCK_TEXT_MODEL_ID` in `.env`, run `aws configure`, then `python scripts/check_bedrock.py` (it lists the models and inference profiles in your region and tells you what to fix) and `python scripts/try_explainer.py`. Optionally run `python scripts/create_guardrail.py` and add the two lines it prints to `.env`.
 2. **Telegram:** create a bot with @BotFather, have the three people message it once, and set `TELEGRAM_BOT_TOKEN` and the three `TELEGRAM_CHAT_*` IDs.
 3. **Ring:** paste a Playground token into `RING_ACCESS_TOKEN`. The dashboard's connection indicator then makes a live `GET /v1/users/me` call, and `make probe` saves scrubbed real responses to `fixtures/`.
 
@@ -105,7 +109,8 @@ flowchart LR
 |---|---|---|
 | Amazon Bedrock Runtime, **Converse API** (image + text) | `converse` with the snapshot as an image block and a fixed prompt | Describes what is visible at the doorway in at most 25 words, with no speculation about anyone's health. Called once per anomaly, never on a schedule. |
 | Amazon Bedrock Runtime, **Converse API** (text) | `converse` with only the facts JSON and the scene description | Phrases the caregiver message. The output is used only if it passes the validator (70 words or fewer, block list, all key times present); otherwise the deterministic template is sent. |
-| Amazon Bedrock (control plane) | `list_foundation_models`, `list_inference_profiles` | Used by `scripts/check_bedrock.py` to diagnose model access. |
+| **Amazon Bedrock Guardrails** (optional) | `guardrailConfig` on the explainer's Converse call; `create_guardrail` and `create_guardrail_version` in `scripts/create_guardrail.py` | Denies the topic "medical diagnosis" and blocks alarming words in model output. If the guardrail intervenes, the deterministic template is sent and the audit log says so. CareLoop's local validator always runs too. |
+| Amazon Bedrock (control plane) | `list_foundation_models`, `list_inference_profiles` | Used by `scripts/check_bedrock.py` to diagnose model access and test the guardrail. |
 
 Model IDs come from `BEDROCK_VISION_MODEL_ID` and `BEDROCK_TEXT_MODEL_ID`; any Converse-compatible model (or inference profile ID) works. Calls use botocore with 10 s timeouts and one retry, and every call writes an audit row (action, reason, outcome with token counts, never content). In line with the Ring Computer Vision Guidelines, only one still frame is sent, inference runs in your own AWS account and region, model output is never treated as ground truth, and every output is checked against a block list with a defined fallback.
 
@@ -136,7 +141,8 @@ All calls are in [`backend/app/ring/client.py`](backend/app/ring/client.py) (ser
 - **Playground token.** Ring access uses a short-lived (about 30 min) Playground token. OAuth account linking, app registration, webhooks and certification are out of scope.
 - **Event shapes.** Event type names differ between the Ring docs and the official sample (see [docs/friction-log.md](docs/friction-log.md)); CareLoop accepts both until confirmed against real responses with `make probe`.
 - **Polling and in-process timers.** One asyncio loop; no webhooks, no job queue, no persistence of timers across restarts beyond what is in SQLite.
-- **One household, one person, one doorbell.** Only the "late start" anomaly is implemented.
+- **One household, one person, one doorbell.** Two anomalies: late start (A1) and long silence (A2). A2 messages always use the deterministic template, and A2 is not part of the evaluation.
+- **Guardrails cover text only.** The Bedrock Guardrail is attached to the explainer's text call; the vision description is checked by the local validator.
 - **Not a medical device** and not an emergency service.
 
 ## Configuration
@@ -152,6 +158,7 @@ Copy `.env.example` to `.env` (`make setup` does this). Settings already in your
 | `AWS_REGION` | `us-east-1` | Bedrock region |
 | `BEDROCK_VISION_MODEL_ID` | | Vision-capable model or inference profile ID |
 | `BEDROCK_TEXT_MODEL_ID` | | Text model or inference profile ID |
+| `BEDROCK_GUARDRAIL_ID`, `BEDROCK_GUARDRAIL_VERSION` | none, `DRAFT` | Optional guardrail on the explainer |
 | `TELEGRAM_BOT_TOKEN` | | Bot token from @BotFather |
 | `TELEGRAM_CHAT_ELDER`, `TELEGRAM_CHAT_CAREGIVER`, `TELEGRAM_CHAT_NEIGHBOR` | | Chat IDs; empty means dashboard only for that person |
 | `PERSON_NAME`, `CAREGIVER_NAME`, `NEIGHBOR_NAME` | Lakshmi, Suresh, Meena | Fictional names |
@@ -174,7 +181,7 @@ The tests never call Ring, Bedrock or Telegram: Ring uses `httpx.MockTransport`,
 
 ```
 backend/app/
-  baseline/  detection/     pure routine model and A1 detector
+  baseline/  detection/     pure routine and quiet-stretch models, A1 and A2 detectors
   ring/                     Ring client, event parsing, poller, fixture scrubber
   ai/  vision/              Bedrock Converse wrapper, prompts, safety checks, explainer
   escalation/  notify/      ladder state machine and runner, Telegram, dashboard channel

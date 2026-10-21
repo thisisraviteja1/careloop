@@ -75,6 +75,13 @@ def main() -> int:
     bedrock = Bedrock(settings.aws_region)
     ok_vision = tiny_call(bedrock, "vision model", settings.bedrock_vision_model_id)
     ok_text = tiny_call(bedrock, "text model", settings.bedrock_text_model_id)
+    if settings.bedrock_guardrail_id:
+        guarded = Bedrock(settings.aws_region, guardrail_id=settings.bedrock_guardrail_id,
+                          guardrail_version=settings.bedrock_guardrail_version)
+        ok_text = tiny_call(guarded, "text model with guardrail",
+                            settings.bedrock_text_model_id) and ok_text
+    else:
+        print("  (no BEDROCK_GUARDRAIL_ID set: run scripts/create_guardrail.py to add one)")
     return 0 if ok_vision and ok_text else 1
 
 

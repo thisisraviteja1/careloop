@@ -21,12 +21,14 @@ from app.ai.explainer import (
     explain,
     neighbor_message,
 )
+from app.baseline.gaps import activity_minutes_by_day, first_alert_minute, gap_baselines
 from app.baseline.model import at_minutes, day_key, day_start
 from app.config import REPO_ROOT, Settings
 from app.core import clock
 from app.core.tokens import TokenError, verify_ack
 from app.db.models import (
     Anomaly,
+    AwayPeriod,
     DeviceHealth,
     EscalationStep,
     Event,
@@ -35,9 +37,16 @@ from app.db.models import (
     to_db,
 )
 from app.db.session import get_engine, reset_db, session_scope
-from app.demo.scenarios import SCENARIOS, DemoState, plan
+from app.demo.scenarios import SCENARIOS, SEEN_AT, DemoState, plan
 from app.demo.seed import DEMO_DEVICE_ID, seed_history
-from app.detection.runner import DetectionResult, run_detection
+from app.detection.runner import (
+    DetectionResult,
+    SilenceResult,
+    activity_times,
+    away_days,
+    run_detection,
+    run_silence_detection,
+)
 from app.escalation.engine import ACKNOWLEDGED, ACTIVE, L1_PENDING, Waits
 from app.escalation.runner import AckResult, EscalationRunner, acknowledge, deliver
 from app.notify.base import Notifier, Recipient
@@ -52,6 +61,9 @@ logger = logging.getLogger(__name__)
 
 FIXTURE_SNAPSHOT = REPO_ROOT / "fixtures" / "demo_snapshot.jpg"
 UNSAFE_SECRETS = {"", "change-me"}
+KIND_REASON = {"A1": "A1 late start", "A2": "A2 long silence"}
+DEMO_AWAY_NOTE = "Demo: away mode scenario"
+MAX_AWAY_SPAN_DAYS = 90
 
 
 @dataclass
@@ -81,7 +93,9 @@ class CareLoop:
                 self.ring = RingClient(settings.ring_mode, settings.ring_access_token)
             except RingError as exc:
                 self.ring_status = RingStatus(settings.ring_mode, False, str(exc))
-        self.bedrock = bedrock if bedrock is not None else Bedrock(settings.aws_region)
+        self.bedrock = bedrock if bedrock is not None else Bedrock(
+            settings.aws_region, guardrail_id=settings.bedrock_guardrail_id,
+            guardrail_version=settings.bedrock_guardrail_version)
         self.telegram: TelegramNotifier | None = None
         if notifiers is None:
             notifiers = [DashboardNotifier()]
@@ -136,6 +150,10 @@ class CareLoop:
                              person_name=self.settings.person_name, device_id=self.device_id,
                              create=create)
 
+    def detect_silence(self, session: Session, create: bool = True) -> SilenceResult:
+        return run_silence_detection(session, tz=self.tz, person_name=self.settings.person_name,
+                                     device_id=self.device_id, create=create)
+
     # ---- the tick ----------------------------------------------------------------------------
 
     def tick(self) -> None:
@@ -149,6 +167,9 @@ class CareLoop:
             result = self.detect(session)
             if result.created and result.anomaly is not None:
                 self._on_new_anomaly(session, result.anomaly, now)
+            silence = self.detect_silence(session)
+            if silence.created and silence.anomaly is not None:
+                self._on_new_anomaly(session, silence.anomaly, now)
             if result.notify_degraded and result.health is not None:
                 self._notify_degraded(session, result, now)
             runner = self.runner()
@@ -175,14 +196,18 @@ class CareLoop:
     def _on_new_anomaly(self, session: Session, anomaly: Anomaly, now: datetime) -> None:
         record = audit.recorder(session)
         self.bedrock.audit = record
-        audit.record(session, "anomaly.detected", "A1 late start",
-                     f"no activity by {anomaly.facts.get('threshold')}")
+        facts = anomaly.facts
+        outcome = (f"no activity by {facts.get('threshold')}" if anomaly.kind == "A1" else
+                   f"silent for {facts.get('gap_minutes')} min "
+                   f"(usual longest {facts.get('typical_max_gap_minutes')} min)")
+        audit.record(session, "anomaly.detected", KIND_REASON[anomaly.kind], outcome)
+        reason = f"anomaly {anomaly.kind} verification"
         if self.settings.demo_mode or self.ring is None:
-            image = take_snapshot(self._fixture_snapshot, record)
+            image = take_snapshot(self._fixture_snapshot, record, reason)
         else:
-            image = take_snapshot(lambda: self.ring.get_snapshot(self.device_id), record)
+            image = take_snapshot(lambda: self.ring.get_snapshot(self.device_id), record, reason)
         anomaly.scene_description = describe(image, self.bedrock,
-                                             self.settings.bedrock_vision_model_id)
+                                             self.settings.bedrock_vision_model_id, reason)
         del image  # bytes never leave memory
         explanation = explain(anomaly.facts, anomaly.scene_description, now,
                               now.astimezone(self.tz), self.bedrock,
@@ -205,6 +230,39 @@ class CareLoop:
                 reason="device health guard", now=now)
         health.caregiver_notified = True
         session.add(health)
+
+    # ---- away mode -------------------------------------------------------------------------
+
+    def list_away(self, session: Session) -> list[AwayPeriod]:
+        return list(session.exec(select(AwayPeriod).order_by(AwayPeriod.start)).all())
+
+    def add_away(self, start: date, end: date, note: str = "") -> AwayPeriod:
+        if end < start:
+            raise ValueError("The end date is before the start date.")
+        if (end - start).days >= MAX_AWAY_SPAN_DAYS:
+            raise ValueError(f"Away periods can be at most {MAX_AWAY_SPAN_DAYS} days.")
+        with self._lock, session_scope() as session:
+            period = AwayPeriod(start=start, end=end, note=note.strip()[:200],
+                                created_at=clock.now())
+            session.add(period)
+            session.flush()
+            audit.record(session, "away.add", "caregiver request",
+                         f"alerts paused {start.isoformat()} to {end.isoformat()}")
+            return period
+
+    def remove_away(self, period_id: int) -> bool:
+        with self._lock, session_scope() as session:
+            period = session.get(AwayPeriod, period_id)
+            if period is None:
+                return False
+            session.delete(period)
+            audit.record(session, "away.remove", "caregiver request",
+                         f"alerts resumed for {period.start.isoformat()} to "
+                         f"{period.end.isoformat()}")
+            return True
+
+    def is_away_today(self, session: Session) -> bool:
+        return day_key(clock.now().astimezone(self.tz)) in away_days(session)
 
     # ---- acknowledgements --------------------------------------------------------------------
 
@@ -251,7 +309,11 @@ class CareLoop:
                 if result.baseline.threshold is None:
                     raise ValueError("Not enough history: seed first.")
                 threshold_at = at_minutes(today, result.baseline.threshold, self.tz)
-                state = plan(scenario, day_start(today, self.tz), threshold_at)
+                silence_at = self._silence_alert_at(session, today)
+                state = plan(scenario, day_start(today, self.tz), threshold_at, silence_at)
+                if state.away:
+                    session.add(AwayPeriod(start=today, end=today, note=DEMO_AWAY_NOTE,
+                                           created_at=clock.now()))
                 health = session.get(DeviceHealth, DEMO_DEVICE_ID) or DeviceHealth(
                     device_id=DEMO_DEVICE_ID)
                 health.status, health.since = state.device_status, to_db(state.started_at)
@@ -259,11 +321,20 @@ class CareLoop:
                 session.add(health)
                 audit.record(session, "demo.run", "demo controls", scenario)
             self.demo = state
-            self._log(f"Scenario {scenario} starts. Alert threshold today: "
-                      f"{clock_time(threshold_at)}.", state.started_at)
+            check = (f"Long-silence check at {clock_time(silence_at)} if no one is seen."
+                     if scenario == "long-silence" and silence_at else
+                     f"Alert threshold today: {clock_time(threshold_at)}.")
+            self._log(f"Scenario {scenario} starts. {check}", state.started_at)
             clock.get_clock().set_time(state.started_at)
             clock.get_clock().set_speed(speed or self.settings.clock_speed)
             return state
+
+    def _silence_alert_at(self, session: Session, today: date) -> datetime | None:
+        """When A2 would fire today after the long-silence scenario's last sighting."""
+        minutes = activity_minutes_by_day(activity_times(session, clock.now()), self.tz)
+        last = SEEN_AT[-1][0] * 60 + SEEN_AT[-1][1]
+        minute = first_alert_minute(last, gap_baselines(minutes, today))
+        return at_minutes(today, minute, self.tz) if minute is not None else None
 
     def demo_reset(self) -> None:
         with self._lock:
@@ -281,6 +352,7 @@ class CareLoop:
         session.exec(delete(NotificationLog).where(NotificationLog.anomaly_id == None,  # noqa: E711
                                                    NotificationLog.ts >= to_db(start)))
         session.exec(delete(Event).where(Event.ts >= to_db(start)))
+        session.exec(delete(AwayPeriod).where(AwayPeriod.note == DEMO_AWAY_NOTE))
 
     def _log(self, text: str, at: datetime | None = None) -> None:
         if self.demo is None:
@@ -297,7 +369,8 @@ class CareLoop:
                               device_id=DEMO_DEVICE_ID, type=event.type, sub_type=event.sub_type,
                               ts=event.at, is_activity=is_activity(event.type, event.sub_type),
                               is_synthetic=True))
-            self._log(f"Doorbell sees {event.sub_type or event.type} motion "
+            earlier = "Earlier today: d" if event.at < demo.started_at else "D"
+            self._log(f"{earlier}oorbell sees {event.sub_type or event.type} motion "
                       f"(simulated event).", event.at)
         demo.events = [e for e in demo.events if e.at > now]
         if due:
@@ -317,12 +390,16 @@ class CareLoop:
             if anomaly.state in (ACKNOWLEDGED, "EXHAUSTED"):
                 self._finish(f"Alert {anomaly.state.lower()}.")
         if demo.finish_after and now >= demo.finish_after and not demo.finished:
+            if anomaly is None and demo.away:
+                self._log("Away mode: no alert, as expected.")
             self._finish("Threshold passed without an alert." if anomaly is None
                          else "Scenario window over.")
 
     def _log_ladder(self, session: Session, anomaly: Anomaly) -> None:
         seen = {e["text"] for e in self.demo.log}
-        text = f"No activity by the threshold: alert raised ({anomaly.explanation_source})."
+        cause = ("No activity by the threshold" if anomaly.kind == "A1"
+                 else "Quiet for longer than usual")
+        text = f"{cause}: alert raised ({anomaly.explanation_source})."
         if text not in seen and anomaly.explanation:
             self._log(text, from_db(anomaly.detected_at))
         steps = session.exec(select(EscalationStep).where(

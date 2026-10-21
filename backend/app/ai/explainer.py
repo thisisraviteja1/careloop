@@ -13,6 +13,7 @@ from typing import Any
 from app.ai.bedrock import Bedrock, BedrockError
 from app.ai.prompts import EXPLAINER_PROMPT, EXPLAINER_SYSTEM
 from app.ai.safety import blocked_terms, word_count
+from app.detection.detector import duration_text
 from app.vision.snapshot import CAMERA_UNAVAILABLE
 
 logger = logging.getLogger(__name__)
@@ -136,9 +137,34 @@ def validate_alert(text: str, parts: AlertParts) -> list[str]:
     return problems
 
 
+def silence_alert(facts: dict[str, Any], scene: str, checkin_at: datetime,
+                  now_local: datetime) -> str:
+    """The deterministic caregiver alert for A2 (long silence), in the same fixed order."""
+    name = facts["person_name"]
+    seen = last_seen_phrase(datetime.fromisoformat(facts["last_seen_ts"]), now_local)
+    start, start_mer = hhmm_to_parts(facts["bucket_start"])
+    end, end_mer = hhmm_to_parts(facts["bucket_end"])
+    span = (f"{start.removesuffix(':00')} to {end.removesuffix(':00')} {end_mer}"
+            if start_mer == end_mer else
+            f"{start.removesuffix(':00')} {start_mer} to {end.removesuffix(':00')} {end_mer}")
+    return " ".join([
+        f"No one has been seen at {name}'s front door since {seen}.",
+        f"Quiet stretches running into {span} usually last up to about "
+        f"{duration_text(5 * round(facts['typical_max_gap_minutes'] / 5))}; this one has "
+        f"lasted {duration_text(facts['gap_minutes'])}.",
+        scene_sentence(scene),
+        f"{name} hasn't answered a check-in sent at "
+        f"{clock_time(checkin_at.astimezone(now_local.tzinfo))}.",
+        ACTION_LINE,
+    ])
+
+
 def explain(facts: dict[str, Any], scene: str, checkin_at: datetime, now_local: datetime,
             bedrock: Bedrock | None = None, model_id: str = "") -> Explanation:
-    """The caregiver alert: Bedrock phrasing if it validates, otherwise the template."""
+    """The caregiver alert: Bedrock phrasing if it validates, otherwise the template.
+    A2 (long silence) always uses its deterministic template."""
+    if facts.get("kind") == "A2":
+        return Explanation(silence_alert(facts, scene, checkin_at, now_local), "template")
     parts = alert_parts(facts, scene, checkin_at, now_local)
     template = template_alert(parts)
     if bedrock is None or not model_id:
@@ -152,8 +178,8 @@ def explain(facts: dict[str, Any], scene: str, checkin_at: datetime, now_local: 
     try:
         text = " ".join(bedrock.converse_text(model_id, prompt, system=EXPLAINER_SYSTEM,
                                               reason=EXPLAIN_REASON).split()).strip('"')
-    except BedrockError:
-        return Explanation(template, "template", ("bedrock error",))
+    except BedrockError as exc:
+        return Explanation(template, "template", (str(exc) or "bedrock error",))
     problems = validate_alert(text, parts)
     if problems:
         bedrock.audit("explainer.validate", EXPLAIN_REASON,
@@ -174,8 +200,9 @@ def neighbor_message(facts: dict[str, Any], caregiver: str, neighbor: str,
     last = facts.get("last_seen_ts")
     seen = (f"since {last_seen_phrase(datetime.fromisoformat(last), now_local)}" if last
             else "today")
+    when = "this morning" if facts.get("kind", "A1") == "A1" else "since then"
     return (f"Hi {neighbor}. No one has been seen at {name}'s front door {seen}, and "
-            f"{name} and {caregiver} haven't answered messages this morning. Could you knock on "
+            f"{name} and {caregiver} haven't answered messages {when}. Could you knock on "
             f"{name}'s door when you can? {ACTION_LINE}")
 
 

@@ -100,6 +100,7 @@
   .status[data-tone="escalating"] { border-left-color: var(--alert); }
   .status[data-tone="degraded"] { border-left-color: var(--degraded); }
   .status[data-tone="learning"] { border-left-color: var(--learn); }
+  .status[data-tone="away"] { border-left-color: var(--ink-2); }
   .chip {
     display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .8rem;
     border-radius: 999px; font-weight: 700; font-size: 1.05rem;
@@ -109,6 +110,13 @@
   [data-tone="escalating"] .chip { background: var(--alert-soft); color: var(--alert); }
   [data-tone="degraded"] .chip { background: var(--degraded-soft); color: var(--degraded); }
   [data-tone="learning"] .chip { background: var(--learn-soft); color: var(--learn); }
+  [data-tone="away"] .chip { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+  .away-form { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-bottom: .8rem; }
+  .away-form label { display: grid; gap: .2rem; color: var(--ink-2); font-size: .94rem; }
+  .away-form input { font: inherit; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); padding: .3rem .5rem; min-width: 0; }
+  .away-form .wide { grid-column: 1 / -1; }
+  .away-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+  .away-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; padding: .5rem .7rem; border: 1px solid var(--line); border-radius: 10px; }
   .headline { font-size: clamp(1.6rem, 1.2rem + 1.4vw, 2.3rem); line-height: 1.2; margin: .8rem 0 .5rem; letter-spacing: -.01em; max-width: 30ch; }
   .status .detail { color: var(--ink-2); margin: 0; max-width: 62ch; font-size: 1.05rem; }
   .facts { display: flex; flex-wrap: wrap; gap: .5rem 2rem; margin: 1rem 0 0; padding: 0; list-style: none; }
@@ -267,6 +275,18 @@
         <ol class="log" id="demo-log" aria-live="polite"></ol>
       </section>
 
+      <section class="panel" aria-labelledby="away-title">
+        <h2 id="away-title">Away mode</h2>
+        <p class="sub">Pause alerts while the person is travelling or staying with family. Those days are also left out of the routine CareLoop learns.</p>
+        <form class="away-form" id="away-form">
+          <label>From<input type="date" id="away-start" required></label>
+          <label>Until<input type="date" id="away-end" required></label>
+          <label class="wide">Note (optional)<input type="text" id="away-note" maxlength="200" placeholder="Visiting family"></label>
+          <button type="submit" class="wide">Pause alerts for these days</button>
+        </form>
+        <ul class="away-list" id="away-list"></ul>
+      </section>
+
       <section class="panel" aria-labelledby="audit-title">
         <h2 id="audit-title">Privacy and audit</h2>
         <p class="promise">Snapshots are taken only when something looks unusual and are never stored.</p>
@@ -326,14 +346,17 @@ function shortDate(iso) {
 }
 
 function hhmm12(v) { if (!v) return "?"; const [h, m] = v.split(":").map(Number); return fmtMinutes(h * 60 + m); }
+function durationText(m) { const h = Math.floor(m / 60), mm = m % 60; return [h ? `${h} h` : "", mm || !h ? `${mm} min` : ""].filter(Boolean).join(" "); }
 function longDate(iso) { return new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" }); }
 
 /* ---------- status ---------- */
+const isSilence = (s) => !!(s.anomaly && s.anomaly.kind === "A2");
 const HEADLINES = {
   normal: (s) => s.last_seen_text ? `${s.person_name} was last seen at ${s.last_seen_text}.` : `Nothing unusual for ${s.person_name}.`,
   waiting: (s) => `${s.person_name} hasn't come to the door yet. That's still within the usual morning.`,
-  unusual: (s) => `${s.person_name} hasn't been seen at the front door this morning.`,
-  escalating: (s) => `${s.person_name} hasn't been seen this morning. People are being asked to check.`,
+  unusual: (s) => isSilence(s) ? `${s.person_name} has been quiet for longer than usual today.` : `${s.person_name} hasn't been seen at the front door this morning.`,
+  escalating: (s) => isSilence(s) ? `${s.person_name} has been quiet for longer than usual. People are being asked to check.` : `${s.person_name} hasn't been seen this morning. People are being asked to check.`,
+  away: (s) => `Alerts are paused: ${s.person_name} is away today.`,
   degraded: (s) => `CareLoop can't watch the front door right now.`,
   learning: (s) => `CareLoop is still learning ${s.person_name}'s routine.`,
 };
@@ -350,6 +373,8 @@ function renderStatus(s) {
   if (s.status === "degraded") detail = `Monitoring degraded since ${s.device.since_text || s.now_text}: the doorbell is ${s.device.status === "offline" ? "offline" : "not sending events"}. No alerts can be raised until it's back, and the caregiver has been told.`;
   else if (s.status === "waiting" && s.threshold_text) detail = `CareLoop will only raise an alert if no one appears by ${s.threshold_text}.`;
   else if (s.anomaly && s.anomaly.explanation) detail = s.anomaly.explanation;
+  else if (s.status === "away") detail = "Away mode is on, so CareLoop raises no alerts and leaves these days out of the routine it learns. Turn it off in the away panel when they're back.";
+  else if (s.status === "normal" && s.silence_check_text) detail = `If no one is seen at the door by ${s.silence_check_text}, that's a longer quiet stretch than usual and CareLoop will check in.`;
   else if (s.status === "learning") detail = `Alerts start after 7 days of history, so they're based on ${s.person_name}'s routine and not a guess.`;
   $("status-detail").textContent = detail;
 
@@ -357,6 +382,7 @@ function renderStatus(s) {
   const add = (k, v) => { if (v) facts.append(el("div", {}, el("dt", { text: k }), el("dd", { text: v }))); };
   add("Last seen", s.last_seen_text);
   add("Alert threshold today", s.threshold_text);
+  add("Quiet-stretch check", s.silence_check_text);
   if (s.anomaly) {
     const level = { L1_PENDING: `Level 1: checking with ${s.person_name}`, L2_PENDING: "Level 2: caregiver", L3_PENDING: "Level 3: neighbor", EXHAUSTED: "All levels tried", ACKNOWLEDGED: `Handled by ${people()[s.anomaly.acked_by] || s.anomaly.acked_by} at ${s.anomaly.acked_text}`, DETECTED: "Starting" }[s.anomaly.state];
     add("Ladder", level);
@@ -491,13 +517,20 @@ function renderAlerts(list) {
   for (const a of list) {
     const f = a.facts || {};
     const head = el("div", { class: "alert-top" },
-      el("h3", { text: `${longDate(a.day)}: no one at the door by ${a.detected_text}` }),
+      el("h3", { text: a.kind === "A2" ? `${longDate(a.day)}: quiet for longer than usual (${a.detected_text})` : `${longDate(a.day)}: no one at the door by ${a.detected_text}` }),
       el("span", { class: "state", "data-s": a.state, text: a.state === "ACKNOWLEDGED" ? `Handled by ${people()[a.acked_by] || a.acked_by} at ${a.acked_text}` : STATE_TEXT[a.state] || a.state }));
     const why = el("dl", { class: "why", "aria-label": "Why this alert" });
     const add = (k, v) => why.append(el("div", {}, el("dt", { text: k }), el("dd", { text: v })));
-    add("Usual window", `${hhmm12(f.usual_window_start)} to ${hhmm12(f.usual_window_end)}`);
-    add("Alert threshold", `${hhmm12(f.threshold)}, window end + ${f.margin_minutes} min`);
-    add("Mornings compared", `${f.sample_count} ${f.pooled ? "days (all weekdays)" : (f.weekday || "") + "s"}`);
+    if (a.kind === "A2") {
+      add("Last seen", hhmm12(f.last_seen_ts.slice(11, 16)));
+      add("Usual longest quiet stretch", `${durationText(f.typical_max_gap_minutes)} (${hhmm12(f.bucket_start)} to ${hhmm12(f.bucket_end)})`);
+      add("Alert after", `${durationText(f.threshold_minutes)} (usual + ${f.margin_minutes} min)`);
+      add("Days compared", `${f.sample_count}`);
+    } else {
+      add("Usual window", `${hhmm12(f.usual_window_start)} to ${hhmm12(f.usual_window_end)}`);
+      add("Alert threshold", `${hhmm12(f.threshold)}, window end + ${f.margin_minutes} min`);
+      add("Mornings compared", `${f.sample_count} ${f.pooled ? "days (all weekdays)" : (f.weekday || "") + "s"}`);
+    }
     add("Camera", a.scene_description === "camera image unavailable" ? "image unavailable" : "checked once, not stored");
     const ladder = el("ol", { class: "ladder", "aria-label": "Who was asked" });
     for (const st of a.steps) ladder.append(el("li", {}, el("span", { class: "t", text: st.time }), el("span", { text: `${st.level}: ${st.role === "elder" ? "check-in to " : st.role === "caregiver" ? "alert to " : "request to "}${people()[st.role]} (${st.outcome})` })));
@@ -534,7 +567,7 @@ async function setupDemo() {
   $("demo").hidden = !d.enabled; $("demo-banner").hidden = !d.enabled;
   if (!d.enabled) return;
   const box = $("scenarios"); box.replaceChildren();
-  const names = { "missed-morning": "Run missed morning", "late-but-normal": "Run late but normal", "elder-replies": "Run elder replies", "camera-offline": "Run camera offline" };
+  const names = { "missed-morning": "Run missed morning", "late-but-normal": "Run late but normal", "elder-replies": "Run elder replies", "camera-offline": "Run camera offline", "long-silence": "Run long silence", "away-day": "Run away day" };
   for (const [key, text] of Object.entries(d.scenarios)) {
     const b = el("button", { type: "button", "data-s": key }, el("span", { text: names[key] || key }), el("small", { text }));
     b.addEventListener("click", () => demoAction(`/api/demo/run`, { scenario: key, speed: Number($("speed").value) }, `Running ${key}`));
@@ -563,6 +596,32 @@ function renderDemo(d) {
   for (const l of d.log) log.append(el("li", {}, el("span", { class: "t", text: l.time }), el("span", { text: l.text })));
 }
 
+/* ---------- away mode ---------- */
+function renderAway(r) {
+  const list = $("away-list"); list.replaceChildren();
+  if (!r.periods.length) { list.append(el("li", { class: "empty", text: "Alerts are on every day." })); return; }
+  for (const p of r.periods) {
+    const range = p.start === p.end ? longDate(p.start) : `${longDate(p.start)} to ${longDate(p.end)}`;
+    const remove = el("button", { type: "button", text: "Resume alerts" });
+    remove.setAttribute("aria-label", `Resume alerts for ${range}`);
+    remove.addEventListener("click", async () => {
+      remove.disabled = true;
+      try { await api(`/api/away/${p.id}`, { method: "DELETE" }); toast(`Alerts resumed for ${range}`); } catch (e) { toast(e.message); }
+      refresh();
+    });
+    list.append(el("li", {}, el("span", { text: p.note ? `${range}: ${p.note}` : range }), remove));
+  }
+}
+function setupAway() {
+  $("away-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = { start: $("away-start").value, end: $("away-end").value, note: $("away-note").value };
+    try { await api("/api/away", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); toast("Alerts paused for those days"); $("away-note").value = ""; }
+    catch (e) { toast(e.message); }
+    refresh();
+  });
+}
+
 /* ---------- refresh loop ---------- */
 async function refreshBaseline() {
   try { renderFingerprint(await api(`/api/baseline${state.fpDate ? `?date=${state.fpDate}` : ""}`)); } catch (e) { $("fp-chart").replaceChildren(el("p", { class: "empty", text: `Couldn't load the routine: ${e.message}` })); }
@@ -571,6 +630,7 @@ async function refresh() {
   try {
     const s = await api("/api/status");
     renderStatus(s); fillWeekdays(s.now.slice(0, 10));
+    if (!$("away-start").value) { $("away-start").value = s.now.slice(0, 10); $("away-end").value = s.now.slice(0, 10); }
   } catch (e) {
     $("status").dataset.tone = "degraded";
     $("status-label").textContent = "Not connected";
@@ -583,11 +643,13 @@ async function refresh() {
     api("/api/timeline").then(renderTimeline).catch(() => {}),
     api("/api/anomalies").then(r => renderAlerts(r.anomalies)).catch(() => {}),
     api("/api/audit?limit=60").then(r => renderAudit(r.entries)).catch(() => {}),
+    api("/api/away").then(renderAway).catch(() => {}),
   ];
   if (state.demoEnabled) jobs.push(api("/api/demo/state").then(renderDemo).catch(() => {}));
   await Promise.all(jobs);
 }
 (async function start() {
+  setupAway();
   await setupDemo().catch(() => {});
   await refresh();
   refreshRing();
