@@ -42,3 +42,17 @@
 - `detection/runner.py`: loads activity, applies the device health guard (offline or event errors mean no A1, and the caregiver is told once), and creates at most one A1 per day.
 - `scripts/seed_history.py --days 28`: deterministic synthetic history (`is_synthetic=true`), with one 7:40 day, two 6:40 days, later weekends, daytime and vehicle events, and 9:40 PM as the last sighting the evening before.
 - Tests cover every case listed in the plan, plus no-peeking and determinism.
+
+## Phase 3: Bedrock vision, explainer, audit
+
+**Done**
+- `ai/bedrock.py`: Converse wrapper (text, and image + text), model IDs from env, 10 s timeouts, one retry (botocore `max_attempts=2`). Every call writes an audit row with action, reason and outcome (model ID and token counts, never content).
+- `vision/snapshot.py`: `take_snapshot` (audited with the reason "anomaly A1 verification", bytes kept in memory only) and `describe` (the planned prompt, plus a request for a noun phrase so the hedged sentence reads naturally). Validates at most 25 words and the block list; anything else gives "camera image unavailable".
+- `ai/safety.py`: forbidden words plus a block list, applied to every model output (Ring Computer Vision Guidelines).
+- `ai/explainer.py`: deterministic template in the fixed order, 12-hour times, hedged camera line; optional Bedrock phrasing from the facts JSON and scene only, kept only if it passes the validator (70 words or fewer, no blocked words, key times and name present). Also builds the check-in, neighbor and degraded messages.
+- `scripts/check_bedrock.py` (lists models and inference profiles, test call, advice per error code) and `scripts/try_explainer.py`.
+- `fixtures/demo_snapshot.jpg`: a **generated illustration** of a doorway with a milk pouch on the mat, no people. Replace it with a real photo (no faces) for the video if you can.
+- Tests use botocore's `Stubber`, which also validates every request against the real Converse API schema.
+
+**Waiting on a human**
+- Run `python scripts/check_bedrock.py`, then `python scripts/try_explainer.py`, with real AWS credentials. Real Bedrock output has not been seen yet.
