@@ -68,10 +68,18 @@ class TelegramNotifier:
         return SendResult("sent")
 
     def get_updates(self, offset: int | None, timeout: int = 20) -> list[dict[str, Any]]:
-        payload: dict[str, Any] = {"timeout": timeout, "allowed_updates": ["callback_query"]}
+        payload: dict[str, Any] = {"timeout": timeout,
+                                   "allowed_updates": ["message", "callback_query"]}
         if offset is not None:
             payload["offset"] = offset
         return self._call("getUpdates", payload, timeout=timeout + TIMEOUT_SECONDS) or []
+
+    def reply(self, chat_id: str, text: str) -> None:
+        """A plain message (used to tell people their chat ID during setup)."""
+        try:
+            self._call("sendMessage", {"chat_id": chat_id, "text": text})
+        except TelegramError as exc:
+            logger.warning("reply failed: %s", exc)
 
     def answer_callback(self, callback_id: str, text: str) -> None:
         try:
@@ -86,6 +94,13 @@ def poll_once(bot: TelegramNotifier, offset: int | None,
     Returns the next offset."""
     for update in bot.get_updates(offset, timeout=timeout):
         offset = int(update["update_id"]) + 1
+        message = update.get("message")
+        if message and (message.get("chat") or {}).get("id") is not None:
+            chat_id = str(message["chat"]["id"])
+            bot.reply(chat_id, f"CareLoop is connected. Your chat ID is {chat_id}. Put it in "
+                               "TELEGRAM_CHAT_ELDER, TELEGRAM_CHAT_CAREGIVER or "
+                               "TELEGRAM_CHAT_NEIGHBOR in .env.")
+            continue
         query = update.get("callback_query")
         if not query:
             continue

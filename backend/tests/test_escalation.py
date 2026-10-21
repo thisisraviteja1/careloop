@@ -201,6 +201,25 @@ def test_telegram_send_and_callback_round_trip() -> None:
                                                     "text": "Thanks!"})
 
 
+def test_messages_to_the_bot_get_their_chat_id_back() -> None:
+    sent: list[tuple[str, dict]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        method = request.url.path.rsplit("/", 1)[-1]
+        sent.append((method, body))
+        if method == "getUpdates":
+            assert "message" in body["allowed_updates"]
+            return httpx.Response(200, json={"ok": True, "result": [{
+                "update_id": 7, "message": {"chat": {"id": 555}, "text": "hi"}}]})
+        return httpx.Response(200, json={"ok": True, "result": {}})
+
+    bot = TelegramNotifier("BOT", str, transport=httpx.MockTransport(handler))
+    assert poll_once(bot, None, lambda t, c: "x", timeout=0) == 8
+    method, body = sent[-1]
+    assert method == "sendMessage" and body["chat_id"] == "555" and "555" in body["text"]
+
+
 def test_telegram_skips_people_without_chat_and_reports_api_errors() -> None:
     bot = TelegramNotifier("BOT", str, transport=httpx.MockTransport(
         lambda r: httpx.Response(400, json={"ok": False, "description": "chat not found"})))

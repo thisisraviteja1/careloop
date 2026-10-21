@@ -113,7 +113,8 @@ def telegram() -> None:
             print(f"✗ bot token rejected: {me.get('description')}")
             return
         print(f"✓ bot @{me['result'].get('username')} is working")
-        updates = client.get(f"{api}/getUpdates").json().get("result", [])
+        updates = client.post(f"{api}/getUpdates", json={
+            "allowed_updates": ["message", "callback_query"]}).json().get("result", [])
         chats: dict[str, str] = {}
         for update in updates:
             message = update.get("message") or update.get("edited_message") or {}
@@ -127,7 +128,9 @@ def telegram() -> None:
         for chat_id, label in chats.items():
             print(f"  chat id {chat_id}: {label}")
         if not chats:
-            print("  → each person (elder, caregiver, neighbor) must open the bot and send 'hi'")
+            print("  → send 'hi' to the bot again. If CareLoop is running (make demo / make run), "
+                  "the bot replies with your chat ID instead, because the server reads the "
+                  "messages first.")
         roles = {"elder": settings.telegram_chat_elder,
                  "caregiver": settings.telegram_chat_caregiver,
                  "neighbor": settings.telegram_chat_neighbor}
