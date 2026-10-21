@@ -69,3 +69,14 @@
 
 **Waiting on a human**
 - Human test with a real bot: message arrives with a button, the link opens the page, and the ack is recorded.
+
+## Phase 5: API, loop, demo runner
+
+**Done**
+- `service.py`: one tick = Ring poll (live) or demo script → detector → on a new anomaly: audited snapshot (fixture in demo mode), Bedrock description, explanation → degraded notice once → escalation for every open alert. Snapshot bytes are dropped right after the vision call.
+- `api/routes.py`: `/api/status`, `/api/timeline`, `/api/baseline`, `/api/anomalies`, `/api/anomalies/{id}`, `POST /api/anomalies/{id}/ack`, `/api/audit`, `/api/ring/health` (a live `users_me` call whenever a token is set, even in demo mode), and `/api/demo/seed|run|reset|state` (demo mode only). Errors use `{"error": {"code", "message", "details"}}`.
+- `main.py`: app factory (`uvicorn app.main:create_app --factory`), lifespan with the tick loop (1 s in demo, `POLL_INTERVAL_SECONDS` live) and the Telegram long-poll loop.
+- Scenarios: `missed-morning`, `late-but-normal`, `elder-replies` (simulated tap two minutes after the check-in), `camera-offline`. Each starts just before today's threshold, and the clock pauses when it finishes.
+- `scripts/demo_scenario.py` and `make demo-cli SCENARIO=…`; `make demo` starts the dashboard in demo mode.
+- End-to-end tests for all four scenarios plus the API.
+- Measured: `missed-morning` at speed 60 runs from start to EXHAUSTED in 95 real seconds (with Bedrock fallbacks; real Bedrock adds a few seconds).

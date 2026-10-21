@@ -47,8 +47,8 @@ def baseline_for(session: Session, now_local: datetime, tz: tzinfo, margin: int)
 
 
 def run_detection(session: Session, *, tz: tzinfo, margin: int, person_name: str,
-                  device_id: str) -> DetectionResult:
-    """One detector tick."""
+                  device_id: str, create: bool = True) -> DetectionResult:
+    """One detector tick. With create=False it only reports (used by the status API)."""
     now_local = clock.now().astimezone(tz)
     day = day_key(now_local)
     activity = activity_times(session, now_local)
@@ -66,7 +66,7 @@ def run_detection(session: Session, *, tz: tzinfo, margin: int, person_name: str
         select(Anomaly).where(Anomaly.kind == "A1", Anomaly.day == day.isoformat())
     ).first()
     created = False
-    if decision.status == "anomaly" and anomaly is None and decision.facts is not None:
+    if create and decision.status == "anomaly" and anomaly is None and decision.facts:
         anomaly = Anomaly(kind="A1", day=day.isoformat(), detected_at=clock.now(),
                           facts=decision.facts, state="DETECTED")
         session.add(anomaly)
