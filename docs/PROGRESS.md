@@ -56,3 +56,16 @@
 
 **Waiting on a human**
 - Run `python scripts/check_bedrock.py`, then `python scripts/try_explainer.py`, with real AWS credentials. Real Bedrock output has not been seen yet.
+
+## Phase 4: escalation, Telegram, big-button ack page
+
+**Done**
+- `escalation/engine.py`: pure state machine (DETECTED → L1 elder → L2 caregiver → L3 neighbor → EXHAUSTED, or ACKNOWLEDGED). Each level's wait starts when the previous one ran out, so a slow tick never stretches the ladder. An exhausted alert can still be acknowledged.
+- `escalation/runner.py`: executes actions on every channel with one retry each, writes `EscalationStep`, `NotificationLog` (message text never contains the token) and `AuditLog` rows. A failing or crashing adapter never stops the ladder.
+- `core/tokens.py`: HMAC-signed, expiring ack tokens of 64 bytes or less, so they fit Telegram's `callback_data`.
+- `notify/telegram.py`: `sendMessage` with an inline "I'm OK" / "I'm handling it" button plus the big-button link in the text (Telegram rejects localhost URLs on buttons), `getUpdates` long-polling, and `answerCallbackQuery`. People without a chat ID are skipped.
+- `notify/dashboard.py`: always-on channel; the dashboard reads `NotificationLog`.
+- `/ack/{token}`: big-button page with no JavaScript needed: 88 px primary button, 26 px text, high contrast in light and dark modes, visible focus ring, `lang` set. Invalid, tampered or expired links get a calm message.
+
+**Waiting on a human**
+- Human test with a real bot: message arrives with a button, the link opens the page, and the ack is recorded.
