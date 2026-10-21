@@ -33,3 +33,12 @@
 
 **Open questions**
 - Event history has no documented time filter, so the client filters after fetching and follows `links.next` for up to 10 pages. Revisit once the probe shows real paging.
+
+## Phase 2: baseline, detector, seed data
+
+**Done**
+- `baseline/model.py` (pure): days start at 04:00; first-activity minute per day; per-weekday [p10, p90] window; threshold = p90 + `MARGIN_MINUTES`; pooled fallback under 4 weekday samples; `learning` under 7 days of history. Only days before the judged day are used.
+- `detection/detector.py` (pure): `evaluate` returns degraded / normal / learning / waiting / anomaly, with the A1 `facts` JSON.
+- `detection/runner.py`: loads activity, applies the device health guard (offline or event errors mean no A1, and the caregiver is told once), and creates at most one A1 per day.
+- `scripts/seed_history.py --days 28`: deterministic synthetic history (`is_synthetic=true`), with one 7:40 day, two 6:40 days, later weekends, daytime and vehicle events, and 9:40 PM as the last sighting the evening before.
+- Tests cover every case listed in the plan, plus no-peeking and determinism.
