@@ -99,3 +99,24 @@
 - Tests: determinism, no future-data leakage, identical code path, shared judged days.
 
 **Result (reported as is, no tuning):** across all six settings CareLoop never exceeds 4 of 61 false alarms (7%), with median delays of 54–105 minutes. Every fixed timer fails somewhere: 8 AM alerts on 61 of 61 normal days for the late riser, 9 AM on up to 36%, and 10 AM waits 180 minutes for the early riser. For the early riser alone, an 8 AM timer is about as good as CareLoop and faster. The honest claim is "no tuning needed", not "always faster".
+
+## Phase 8: hardening, README, submission pack
+
+**Done**
+- README: problem, comparison with fixed timers, evaluation table and chart, priority categories, run instructions that need no Ring hardware, mermaid architecture, AWS services and how they're used, Ring endpoints, privacy, honest limitations, env table, tests.
+- `docs/product-feedback.md` (draft, with *to complete* markers for the parts that need real credentials) and friction log entries 5–7.
+- Clean-clone check: fresh clone → 91 tests pass, ruff clean, the evaluation regenerates byte-for-byte, and a CLI scenario completes.
+- Secret scan: no keys or tokens in tracked files (only dummy credentials in a test); fixtures contain no personal data.
+- Upstream contribution prepared in `contrib/ring-api-helloworld/` (snapshot script, README row, PR text). **Not opened:** it must be tested with a real token and device first.
+- Tagged `v0.1-hackathon`.
+
+**Waiting on a human (in order)**
+1. `make setup && make test` on the recording machine.
+2. `make probe` with a fresh Playground token → commit the scrubbed `fixtures/ring_*.json`, and tell Claude Code the real event names so `ring/events.py` can be trimmed.
+3. Bedrock: `python scripts/check_bedrock.py`, then `python scripts/try_explainer.py`.
+4. Telegram: bot token and three chat IDs; run `missed-morning` and tap the buttons.
+5. Test and open the upstream PR; record the URL.
+6. Fill the "to complete" parts of `docs/product-feedback.md` and add friction log entries from steps 2–5.
+7. Optional: replace `fixtures/demo_snapshot.jpg` with a real doorstep photo (no people or faces).
+
+**Next (stretch, Phase 9):** A2 "long silence", away mode, Bedrock Guardrails.

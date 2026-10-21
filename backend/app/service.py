@@ -312,7 +312,8 @@ class CareLoop:
             if (demo.elder_ack_delay and anomaly.state == L1_PENDING
                     and now >= from_db(anomaly.level_started_at) + demo.elder_ack_delay):
                 acknowledge(session, anomaly.id, "elder", "demo (simulated tap on I'm OK)", now)
-                self._log("Lakshmi taps “I'm OK” (simulated). The ladder stops.", now)
+                self._log(f"{self.settings.person_name} taps “I'm OK” (simulated). "
+                          "The ladder stops.", now)
             if anomaly.state in (ACKNOWLEDGED, "EXHAUSTED"):
                 self._finish(f"Alert {anomaly.state.lower()}.")
         if demo.finish_after and now >= demo.finish_after and not demo.finished:
