@@ -1,14 +1,605 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CareLoop</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CareLoop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #edf1ef;
+    --surface: #ffffff;
+    --surface-2: #f6f8f7;
+    --ink: #173029;
+    --ink-2: #44574f;
+    --line: #c9d3cf;
+    --dawn: #e8b04a;
+    --dawn-soft: rgba(232, 176, 74, .28);
+    --night: #24324a;
+    --ok: #2e6b4e;
+    --ok-soft: #dcebe2;
+    --warn: #94600a;
+    --warn-soft: #f7ead0;
+    --alert: #a23e2a;
+    --alert-soft: #f6dfd9;
+    --degraded: #56627a;
+    --degraded-soft: #e2e6ee;
+    --learn: #4a55a0;
+    --learn-soft: #e3e5f4;
+    --focus: #b45309;
+    --radius-lg: 18px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 2px rgba(23, 48, 41, .06), 0 6px 20px rgba(23, 48, 41, .06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101a17; --surface: #172420; --surface-2: #1c2b26; --ink: #e9f0ed;
+      --ink-2: #b3c2bc; --line: #2f413b; --dawn: #f0c062; --dawn-soft: rgba(240, 192, 98, .22);
+      --night: #0b1220; --ok: #6cc596; --ok-soft: #1c3529; --warn: #f0b860;
+      --warn-soft: #3a2e15; --alert: #f08a73; --alert-soft: #40211a; --degraded: #a9b4cb;
+      --degraded-soft: #252c3a; --learn: #a7b0f0; --learn-soft: #262a48; --focus: #f59e0b;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101a17; --surface: #172420; --surface-2: #1c2b26; --ink: #e9f0ed;
+    --ink-2: #b3c2bc; --line: #2f413b; --dawn: #f0c062; --dawn-soft: rgba(240, 192, 98, .22);
+    --night: #0b1220; --ok: #6cc596; --ok-soft: #1c3529; --warn: #f0b860;
+    --warn-soft: #3a2e15; --alert: #f08a73; --alert-soft: #40211a; --degraded: #a9b4cb;
+    --degraded-soft: #252c3a; --learn: #a7b0f0; --learn-soft: #262a48; --focus: #f59e0b;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.55 "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 6px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .demo-banner {
+    background: var(--night); color: #f6f1e4; text-align: center; padding: .55rem 1rem;
+    font-size: .95rem;
+  }
+  .demo-banner strong { color: var(--dawn); }
+
+  .shell { max-width: 1240px; margin: 0 auto; padding: 1.5rem 16px 4rem; }
+  header.top {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+    gap: .5rem 1.5rem; margin-bottom: 1.25rem;
+  }
+  .brand { font-size: 1.35rem; font-weight: 700; letter-spacing: -.01em; margin: 0; }
+  .brand span { color: var(--ink-2); font-weight: 400; }
+  .clock { color: var(--ink-2); font-size: .98rem; }
+  .ring-pill {
+    display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .7rem;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+    font-size: .92rem;
+  }
+  .dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--degraded); flex: none; }
+  .dot.on { background: var(--ok); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 1.25rem; align-items: start; }
+  @media (max-width: 980px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  .stack { display: grid; gap: 1.25rem; min-width: 0; }
+
+  section.panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+    padding: 1.25rem 1.35rem; box-shadow: var(--shadow); min-width: 0;
+  }
+  .panel h2 { font-size: 1.15rem; margin: 0 0 .25rem; }
+  .panel .sub { color: var(--ink-2); margin: 0 0 1rem; font-size: .98rem; }
+
+  /* ---- status hero ---- */
+  .status { border-left: 10px solid var(--ok); }
+  .status[data-tone="unusual"] { border-left-color: var(--warn); }
+  .status[data-tone="escalating"] { border-left-color: var(--alert); }
+  .status[data-tone="degraded"] { border-left-color: var(--degraded); }
+  .status[data-tone="learning"] { border-left-color: var(--learn); }
+  .chip {
+    display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .8rem;
+    border-radius: 999px; font-weight: 700; font-size: 1.05rem;
+    background: var(--ok-soft); color: var(--ok);
+  }
+  [data-tone="unusual"] .chip { background: var(--warn-soft); color: var(--warn); }
+  [data-tone="escalating"] .chip { background: var(--alert-soft); color: var(--alert); }
+  [data-tone="degraded"] .chip { background: var(--degraded-soft); color: var(--degraded); }
+  [data-tone="learning"] .chip { background: var(--learn-soft); color: var(--learn); }
+  .headline { font-size: clamp(1.6rem, 1.2rem + 1.4vw, 2.3rem); line-height: 1.2; margin: .8rem 0 .5rem; letter-spacing: -.01em; max-width: 30ch; }
+  .status .detail { color: var(--ink-2); margin: 0; max-width: 62ch; font-size: 1.05rem; }
+  .facts { display: flex; flex-wrap: wrap; gap: .5rem 2rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+  .facts dt { color: var(--ink-2); font-size: .9rem; }
+  .facts dd { margin: 0; font-weight: 700; font-size: 1.05rem; }
+  .actions { margin-top: 1.1rem; display: flex; flex-wrap: wrap; gap: .75rem; }
+
+  button, .btn {
+    font: inherit; font-weight: 700; min-height: 44px; padding: .55rem 1.1rem; border-radius: 12px;
+    border: 2px solid var(--ink); background: var(--surface); color: var(--ink); cursor: pointer;
+  }
+  button.primary { background: var(--ink); color: var(--surface); }
+  button:disabled { opacity: .5; cursor: progress; }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+
+  /* ---- fingerprint ---- */
+  .fp-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1rem; }
+  .fp-head select { font: inherit; min-height: 44px; padding: .3rem .6rem; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); }
+  .fp { width: 100%; height: auto; display: block; margin-top: .5rem; overflow: visible; max-width: 100%; }
+  .fp text { fill: var(--ink-2); font-size: 13px; font-family: inherit; }
+  .fp .label-strong { fill: var(--ink); font-weight: 700; }
+  .caption { margin: .75rem 0 0; font-size: 1.02rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; margin: .6rem 0 0; padding: 0; list-style: none; color: var(--ink-2); font-size: .92rem; }
+  .legend li { display: inline-flex; align-items: center; gap: .45rem; }
+  .sw { width: 22px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* ---- timeline ---- */
+  .tl { width: 100%; height: auto; display: block; }
+  .tl text { fill: var(--ink-2); font-size: 12px; font-family: inherit; }
+
+  /* ---- alerts ---- */
+  .alerts { display: grid; gap: 1rem; }
+  .alert { border: 1px solid var(--line); border-radius: 14px; padding: 1rem 1.1rem; background: var(--surface-2); }
+  .alert-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem 1rem; align-items: baseline; }
+  .alert h3 { margin: 0; font-size: 1.05rem; }
+  .state { font-weight: 700; font-size: .95rem; }
+  .state[data-s="ACKNOWLEDGED"] { color: var(--ok); }
+  .state[data-s="EXHAUSTED"], .state[data-s="DETECTED"] { color: var(--warn); }
+  .state[data-s^="L"] { color: var(--alert); }
+  .message { font-size: 1.08rem; margin: .6rem 0; max-width: 68ch; }
+  .why { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .5rem; margin: .75rem 0; padding: .75rem; border-radius: 10px; background: var(--surface); border: 1px dashed var(--line); }
+  .why div { min-width: 0; }
+  .why dt { color: var(--ink-2); font-size: .85rem; }
+  .why dd { margin: 0; font-weight: 700; }
+  .ladder { list-style: none; margin: .5rem 0 0; padding: 0; display: grid; gap: .35rem; }
+  .ladder li { display: grid; grid-template-columns: 4.8rem 1fr; gap: .5rem; font-size: .96rem; }
+  .ladder .t { color: var(--ink-2); }
+  .source { color: var(--ink-2); font-size: .9rem; margin: .5rem 0 0; }
+  details.msgs { margin-top: .6rem; }
+  details.msgs summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; }
+  details.msgs p { margin: .3rem 0 .6rem; font-size: .96rem; }
+  .empty { color: var(--ink-2); margin: 0; }
+
+  /* ---- side panels ---- */
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th { text-align: left; color: var(--ink-2); font-weight: 400; padding: .3rem .4rem .3rem 0; border-bottom: 1px solid var(--line); }
+  td { padding: .45rem .4rem .45rem 0; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: break-word; }
+  td.action { font-weight: 700; word-break: normal; overflow-wrap: normal; }
+  td.when { white-space: nowrap; color: var(--ink-2); }
+  .audit-wrap { max-height: 420px; overflow: auto; }
+  .promise { margin: 0 0 .9rem; padding: .7rem .85rem; border-radius: 10px; background: var(--ok-soft); color: var(--ink); }
+
+  .demo .scen { display: grid; gap: .6rem; }
+  .demo .row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: .8rem; }
+  .demo label { color: var(--ink-2); }
+  .demo select { font: inherit; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); padding: .3rem .5rem; }
+  .scen button { text-align: left; display: grid; gap: .1rem; width: 100%; }
+  .scen button small { font-weight: 400; color: var(--ink-2); }
+  .log { list-style: none; padding: 0; margin: .9rem 0 0; display: grid; gap: .3rem; font-size: .94rem; }
+  .log li { display: grid; grid-template-columns: 4.8rem 1fr; gap: .4rem; }
+  .log .t { color: var(--ink-2); }
+  .toast { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: .7rem 1.1rem; border-radius: 12px; max-width: calc(100% - 32px); }
+  .toast[hidden] { display: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .pulse { animation: pulse 2.4s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .35; } }
+  }
+</style>
 </head>
 <body>
-  <main>
-    <h1>CareLoop</h1>
-    <p>The dashboard arrives in Phase 6.</p>
-  </main>
+<div class="demo-banner" id="demo-banner" hidden>
+  <strong>Demo controls · simulated data · fixture image</strong>
+  <span id="demo-banner-detail"></span>
+</div>
+
+<div class="shell">
+  <header class="top">
+    <h1 class="brand">CareLoop <span id="brand-person"></span></h1>
+    <p class="clock" id="clock" aria-live="off"></p>
+    <span class="ring-pill" id="ring" title="Live call to the Ring API (GET /v1/users/me)">
+      <span class="dot" id="ring-dot"></span><span id="ring-text">Checking Ring connection</span>
+    </span>
+  </header>
+
+  <div class="grid">
+    <main class="stack" id="main">
+      <section class="panel status" id="status" data-tone="normal" aria-labelledby="status-chip">
+        <div aria-live="polite" aria-atomic="true">
+          <span class="chip" id="status-chip"><span aria-hidden="true" id="status-icon">✅</span><span id="status-label">Loading</span></span>
+          <p class="headline" id="status-headline">Reading today's routine…</p>
+          <p class="detail" id="status-detail"></p>
+        </div>
+        <dl class="facts" id="status-facts"></dl>
+        <div class="actions" id="status-actions"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="fp-title">
+        <div class="fp-head">
+          <div>
+            <h2 id="fp-title">Morning routine</h2>
+            <p class="sub" id="fp-sub">When someone first appears at the front door, morning by morning.</p>
+          </div>
+          <label><span class="sr-only">Weekday to show</span>
+            <select id="fp-day" aria-label="Weekday to show"></select>
+          </label>
+        </div>
+        <div id="fp-chart"></div>
+        <ul class="legend" aria-hidden="true">
+          <li><span class="sw" style="background:var(--dawn-soft);border:1px solid var(--dawn)"></span>Usual window</li>
+          <li><span class="sw" style="border-top:2px dashed var(--alert);height:0"></span>Alert threshold</li>
+          <li><span class="sw" style="background:var(--ink);width:12px;border-radius:50%"></span>First appearance that morning</li>
+        </ul>
+        <p class="caption" id="fp-caption">Alerts come from Lakshmi's own routine, not a fixed timer.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="tl-title">
+        <h2 id="tl-title">Today at the front door</h2>
+        <p class="sub" id="tl-sub">Every doorbell event since 4:00 AM.</p>
+        <div id="tl-chart"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="alerts-title">
+        <h2 id="alerts-title">Alerts</h2>
+        <p class="sub">What CareLoop noticed, why, and who was asked.</p>
+        <div class="alerts" id="alerts"><p class="empty">No alerts yet.</p></div>
+      </section>
+    </main>
+
+    <aside class="stack">
+      <section class="panel demo" id="demo" hidden aria-labelledby="demo-title">
+        <h2 id="demo-title">Demo controls</h2>
+        <p class="sub">Simulated data and a fixture image. Bedrock and Telegram calls are real when configured.</p>
+        <div class="row">
+          <button type="button" id="btn-seed">Seed 28 days of history</button>
+          <button type="button" id="btn-reset">Reset</button>
+        </div>
+        <div class="row">
+          <label for="speed">Clock speed</label>
+          <select id="speed">
+            <option value="30">×30</option>
+            <option value="60" selected>×60 (30 min in 30 s)</option>
+            <option value="120">×120</option>
+          </select>
+        </div>
+        <div class="scen" id="scenarios"></div>
+        <ol class="log" id="demo-log" aria-live="polite"></ol>
+      </section>
+
+      <section class="panel" aria-labelledby="audit-title">
+        <h2 id="audit-title">Privacy and audit</h2>
+        <p class="promise">Snapshots are taken only when something looks unusual and are never stored.</p>
+        <p class="sub">Every snapshot, model call, message and acknowledgement, newest first.</p>
+        <div class="audit-wrap" tabindex="0" aria-label="Audit log">
+          <table>
+            <thead><tr><th scope="col">Time</th><th scope="col">Action</th><th scope="col">Reason and outcome</th></tr></thead>
+            <tbody id="audit"><tr><td colspan="3" class="empty">Nothing recorded yet.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const SVG = "http://www.w3.org/2000/svg";
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const state = { status: null, fpDate: null, demoEnabled: false, busy: false };
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") node.className = v; else if (k === "text") node.textContent = v;
+    else node.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of children) if (c !== null && c !== undefined) node.append(c);
+  return node;
+}
+function svg(tag, attrs = {}, text) {
+  const node = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error ? body.error.message : `HTTP ${res.status}`);
+  return body;
+}
+function toast(text) {
+  const t = $("toast"); t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, 4000);
+}
+function fmtMinutes(m) {
+  const h = Math.floor(m / 60) % 24, mm = String(Math.round(m % 60)).padStart(2, "0");
+  return `${h % 12 || 12}:${mm} ${h < 12 ? "AM" : "PM"}`;
+}
+function shortDate(iso) {
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function hhmm12(v) { if (!v) return "?"; const [h, m] = v.split(":").map(Number); return fmtMinutes(h * 60 + m); }
+function longDate(iso) { return new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" }); }
+
+/* ---------- status ---------- */
+const HEADLINES = {
+  normal: (s) => s.last_seen_text ? `${s.person_name} was last seen at ${s.last_seen_text}.` : `Nothing unusual for ${s.person_name}.`,
+  waiting: (s) => `${s.person_name} hasn't come to the door yet. That's still within the usual morning.`,
+  unusual: (s) => `${s.person_name} hasn't been seen at the front door this morning.`,
+  escalating: (s) => `${s.person_name} hasn't been seen this morning. People are being asked to check.`,
+  degraded: (s) => `CareLoop can't watch the front door right now.`,
+  learning: (s) => `CareLoop is still learning ${s.person_name}'s routine.`,
+};
+function renderStatus(s) {
+  state.status = s;
+  const tone = s.status === "waiting" ? "normal" : s.status;
+  $("status").dataset.tone = tone;
+  $("status-icon").textContent = s.icon;
+  $("status-label").textContent = s.status === "learning" ? `Learning routine (${s.learning_days} of ${s.learning_needed} days)` : s.label;
+  $("status-headline").textContent = (HEADLINES[s.status] || HEADLINES.normal)(s);
+  $("brand-person").textContent = `for ${s.person_name}`;
+  $("fp-caption").textContent = `Alerts come from ${s.person_name}'s own routine, not a fixed timer.`;
+  let detail = "";
+  if (s.status === "degraded") detail = `Monitoring degraded since ${s.device.since_text || s.now_text}: the doorbell is ${s.device.status === "offline" ? "offline" : "not sending events"}. No alerts can be raised until it's back, and the caregiver has been told.`;
+  else if (s.status === "waiting" && s.threshold_text) detail = `CareLoop will only raise an alert if no one appears by ${s.threshold_text}.`;
+  else if (s.anomaly && s.anomaly.explanation) detail = s.anomaly.explanation;
+  else if (s.status === "learning") detail = `Alerts start after 7 days of history, so they're based on ${s.person_name}'s routine and not a guess.`;
+  $("status-detail").textContent = detail;
+
+  const facts = $("status-facts"); facts.replaceChildren();
+  const add = (k, v) => { if (v) facts.append(el("div", {}, el("dt", { text: k }), el("dd", { text: v }))); };
+  add("Last seen", s.last_seen_text);
+  add("Alert threshold today", s.threshold_text);
+  if (s.anomaly) {
+    const level = { L1_PENDING: `Level 1: checking with ${s.person_name}`, L2_PENDING: "Level 2: caregiver", L3_PENDING: "Level 3: neighbor", EXHAUSTED: "All levels tried", ACKNOWLEDGED: `Handled by ${people()[s.anomaly.acked_by] || s.anomaly.acked_by} at ${s.anomaly.acked_text}`, DETECTED: "Starting" }[s.anomaly.state];
+    add("Ladder", level);
+  }
+  add("Doorbell", s.device.status === "unknown" ? null : s.device.status);
+
+  const actions = $("status-actions"); actions.replaceChildren();
+  if (s.anomaly && !["ACKNOWLEDGED"].includes(s.anomaly.state)) {
+    const b = el("button", { type: "button", class: "primary", text: "I'm handling it" });
+    b.addEventListener("click", () => acknowledge(s.anomaly.id, b));
+    actions.append(b);
+  }
+  $("clock").textContent = `${new Date(s.now).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}, ${s.now_text}${s.clock_speed !== 1 ? (s.clock_speed === 0 ? " (clock paused)" : ` (clock ×${s.clock_speed})`) : ""}`;
+}
+async function acknowledge(id, button) {
+  button.disabled = true;
+  try { const r = await api(`/api/anomalies/${id}/ack`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ by: "caregiver" }) }); toast(r.message); }
+  catch (e) { toast(e.message); }
+  refresh();
+}
+
+/* ---------- routine fingerprint ---------- */
+const AX_START = 330, AX_END = 630; // 5:30 AM – 10:30 AM
+function chartWidth(box) { return Math.max(300, Math.round(box.clientWidth || 720)); }
+function renderFingerprint(b) {
+  state.lastBaseline = b;
+  const box = $("fp-chart"); box.replaceChildren();
+  $("fp-sub").textContent = b.pooled
+    ? `Fewer than 4 past ${b.weekday}s, so every day counts (${b.samples.length} mornings).`
+    : `First appearance at the front door on the last ${b.samples.length} ${b.weekday}s.`;
+  if (!b.samples.length) { box.append(el("p", { class: "empty", text: "No history yet. Seed the demo or let CareLoop watch for a week." })); return; }
+  const rows = b.samples.slice(-8);
+  const W = chartWidth(box), narrow = W < 520, left = narrow ? 86 : 112, right = 18, top = 34, rowH = 30, todayGap = 14;
+  const H = top + rows.length * rowH + todayGap + rowH + 34;
+  const x = (m) => left + (Math.min(Math.max(m, AX_START), AX_END) - AX_START) / (AX_END - AX_START) * (W - left - right);
+  const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "fp", role: "img",
+    "aria-label": `Usual window ${b.window_text[0]} to ${b.window_text[1]}. Alert threshold ${b.threshold_text}. ${rows.map(r => `${shortDate(r.date)} ${r.time}`).join(", ")}. Today: ${b.today_minutes != null ? fmtMinutes(b.today_minutes) : "no activity yet"}.` });
+  const defs = svg("defs");
+  const grad = svg("linearGradient", { id: "dawn", x1: "0", x2: "1", y1: "0", y2: "0" });
+  grad.append(svg("stop", { offset: "0", "stop-color": "var(--night)", "stop-opacity": ".16" }),
+              svg("stop", { offset: ".45", "stop-color": "var(--dawn)", "stop-opacity": ".10" }),
+              svg("stop", { offset: "1", "stop-color": "var(--dawn)", "stop-opacity": ".02" }));
+  defs.append(grad); s.append(defs);
+  const plotBottom = H - 34;
+  s.append(svg("rect", { x: left, y: top - 8, width: W - left - right, height: plotBottom - top + 8, fill: "url(#dawn)", rx: 8 }));
+  if (b.window[0] != null) {
+    s.append(svg("rect", { x: x(b.window[0]), y: top - 8, width: Math.max(2, x(b.window[1]) - x(b.window[0])), height: plotBottom - top + 8, fill: "var(--dawn-soft)", stroke: "var(--dawn)", "stroke-width": 1 }));
+    if (!narrow) s.append(svg("text", { x: x(b.window[0]), y: top - 14, "text-anchor": "end", class: "label-strong" }, `usual ${b.window_text[0].replace(" AM", "")}–${b.window_text[1]}`));
+  }
+  if (b.threshold != null) {
+    s.append(svg("line", { x1: x(b.threshold), x2: x(b.threshold), y1: top - 8, y2: plotBottom, stroke: "var(--alert)", "stroke-width": 2, "stroke-dasharray": "6 5" }));
+    s.append(svg("text", { x: x(b.threshold) + 6, y: top - 14, "text-anchor": x(b.threshold) > W - 160 ? "end" : "start", fill: "var(--alert)", "font-weight": 700 }, narrow ? `alert ${b.threshold_text}` : `alert after ${b.threshold_text}`));
+  }
+  for (let h = 6; h <= 10; h++) {
+    s.append(svg("line", { x1: x(h * 60), x2: x(h * 60), y1: plotBottom, y2: plotBottom + 5, stroke: "var(--ink-2)" }));
+    s.append(svg("text", { x: x(h * 60), y: plotBottom + 18, "text-anchor": "middle" }, `${h} AM`));
+  }
+  rows.forEach((r, i) => {
+    const y = top + i * rowH + rowH / 2;
+    s.append(svg("text", { x: left - 10, y: y + 4, "text-anchor": "end" }, narrow ? shortDate(r.date).replace(/^\w+, /, "") : shortDate(r.date)));
+    s.append(svg("line", { x1: left, x2: W - right, y1: y, y2: y, stroke: "var(--line)", "stroke-width": 1 }));
+    const dot = svg("circle", { cx: x(r.minutes), cy: y, r: 6.5, fill: "var(--ink)" });
+    dot.append(svg("title", {}, `${shortDate(r.date)}: ${r.time}`));
+    s.append(dot);
+  });
+  const ty = top + rows.length * rowH + todayGap + rowH / 2;
+  const isToday = state.status && b.date === state.status.now.slice(0, 10);
+  s.append(svg("text", { x: left - 12, y: ty + 4, "text-anchor": "end", class: "label-strong" }, isToday ? "Today" : shortDate(b.date)));
+  s.append(svg("line", { x1: left, x2: W - right, y1: ty, y2: ty, stroke: "var(--ink-2)", "stroke-width": 1.5 }));
+  if (b.today_minutes != null) {
+    s.append(svg("circle", { cx: x(b.today_minutes), cy: ty, r: 9, fill: b.threshold != null && b.today_minutes > b.threshold ? "var(--warn)" : "var(--ok)", stroke: "var(--surface)", "stroke-width": 3 }));
+    s.append(svg("text", { x: x(b.today_minutes) + 14, y: ty + 4, class: "label-strong" }, fmtMinutes(b.today_minutes)));
+  } else if (isToday) {
+    const nx = x(b.now_minutes);
+    s.append(svg("line", { x1: left, x2: nx, y1: ty, y2: ty, stroke: "var(--ink)", "stroke-width": 3, "stroke-linecap": "round" }));
+    s.append(svg("circle", { cx: nx, cy: ty, r: 6, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 3, class: "pulse" }));
+    s.append(svg("text", { x: nx > W - 200 ? nx - 12 : nx + 12, y: ty - 10, "text-anchor": nx > W - 200 ? "end" : "start", class: "label-strong" }, `no one yet, now ${fmtMinutes(b.now_minutes)}`));
+  }
+  box.append(s);
+}
+function fillWeekdays(currentDate) {
+  const sel = $("fp-day");
+  if (sel.options.length) return;
+  const today = new Date(currentDate + "T12:00:00");
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(today.getDate() - i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    sel.append(el("option", { value: i === 0 ? "" : iso, text: i === 0 ? `Today (${d.toLocaleDateString("en-GB", { weekday: "long" })})` : d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" }) }));
+  }
+  sel.addEventListener("change", () => { state.fpDate = sel.value || null; refreshBaseline(); });
+}
+
+/* ---------- today's timeline ---------- */
+function renderTimeline(t) {
+  state.lastTimeline = t;
+  const box = $("tl-chart"); box.replaceChildren();
+  const W = chartWidth(box), H = 92, left = 16, right = 16, y = 40;
+  const start = 240, end = 1440 + 240;
+  const x = (m) => left + (Math.min(Math.max(m, start), end) - start) / (end - start) * (W - left - right);
+  const activity = t.events.filter(e => e.is_activity);
+  $("tl-sub").textContent = t.events.length
+    ? `${activity.length} sighting${activity.length === 1 ? "" : "s"} of a person and ${t.events.length - activity.length} other event${t.events.length - activity.length === 1 ? "" : "s"} since 4:00 AM.`
+    : "Nothing at the front door since 4:00 AM.";
+  const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "tl", role: "img",
+    "aria-label": t.events.length ? `Events today: ${t.events.map(e => `${e.time} ${e.is_activity ? "person" : (e.sub_type || e.type)}`).join(", ")}` : "No events today yet." });
+  if (t.window[0] != null) s.append(svg("rect", { x: x(t.window[0]), y: y - 18, width: Math.max(2, x(t.window[1]) - x(t.window[0])), height: 36, fill: "var(--dawn-soft)", stroke: "var(--dawn)" }));
+  if (t.threshold != null) s.append(svg("line", { x1: x(t.threshold), x2: x(t.threshold), y1: y - 22, y2: y + 22, stroke: "var(--alert)", "stroke-width": 2, "stroke-dasharray": "5 4" }));
+  s.append(svg("line", { x1: left, x2: W - right, y1: y, y2: y, stroke: "var(--line)", "stroke-width": 2 }));
+  for (const [m, label] of (W < 520 ? [[240, "4 AM"], [720, "noon"], [1200, "8 PM"]] : [[240, "4 AM"], [480, "8 AM"], [720, "noon"], [960, "4 PM"], [1200, "8 PM"], [1440, "midnight"]])) {
+    s.append(svg("text", { x: x(m), y: H - 8, "text-anchor": m === 240 ? "start" : "middle" }, label));
+  }
+  for (const e of t.events) {
+    const node = e.is_activity
+      ? svg("circle", { cx: x(e.minutes), cy: y, r: 7, fill: "var(--ink)" })
+      : svg("rect", { x: x(e.minutes) - 4, y: y - 4, width: 8, height: 8, fill: "none", stroke: "var(--ink-2)", "stroke-width": 1.5 });
+    node.append(svg("title", {}, `${e.time}: ${e.is_activity ? "person at the door" : (e.sub_type || e.type)}${e.is_synthetic ? " (simulated)" : ""}`));
+    s.append(node);
+  }
+  if (t.now_minutes >= start && t.now_minutes <= end) {
+    s.append(svg("line", { x1: x(t.now_minutes), x2: x(t.now_minutes), y1: y - 26, y2: y + 26, stroke: "var(--ink)", "stroke-width": 2 }));
+    s.append(svg("text", { x: x(t.now_minutes), y: 11, "text-anchor": "middle", fill: "var(--ink)" }, "now"));
+  }
+  box.append(s);
+}
+
+/* ---------- alert history ---------- */
+const people = () => (state.status && state.status.people) || { elder: "the person", caregiver: "the caregiver", neighbor: "the neighbor" };
+const STATE_TEXT = { DETECTED: "Starting", L1_PENDING: "Waiting for a reply to the check-in", L2_PENDING: "Waiting for the caregiver", L3_PENDING: "Waiting for the neighbor", EXHAUSTED: "Everyone was asked, no reply", ACKNOWLEDGED: "Handled" };
+function renderAlerts(list) {
+  const box = $("alerts"); box.replaceChildren();
+  if (!list.length) { box.append(el("p", { class: "empty", text: "No alerts. When a morning looks unusual, the reasoning and every message sent appear here." })); return; }
+  for (const a of list) {
+    const f = a.facts || {};
+    const head = el("div", { class: "alert-top" },
+      el("h3", { text: `${longDate(a.day)}: no one at the door by ${a.detected_text}` }),
+      el("span", { class: "state", "data-s": a.state, text: a.state === "ACKNOWLEDGED" ? `Handled by ${people()[a.acked_by] || a.acked_by} at ${a.acked_text}` : STATE_TEXT[a.state] || a.state }));
+    const why = el("dl", { class: "why", "aria-label": "Why this alert" });
+    const add = (k, v) => why.append(el("div", {}, el("dt", { text: k }), el("dd", { text: v })));
+    add("Usual window", `${hhmm12(f.usual_window_start)} to ${hhmm12(f.usual_window_end)}`);
+    add("Alert threshold", `${hhmm12(f.threshold)}, window end + ${f.margin_minutes} min`);
+    add("Mornings compared", `${f.sample_count} ${f.pooled ? "days (all weekdays)" : (f.weekday || "") + "s"}`);
+    add("Camera", a.scene_description === "camera image unavailable" ? "image unavailable" : "checked once, not stored");
+    const ladder = el("ol", { class: "ladder", "aria-label": "Who was asked" });
+    for (const st of a.steps) ladder.append(el("li", {}, el("span", { class: "t", text: st.time }), el("span", { text: `${st.level}: ${st.role === "elder" ? "check-in to " : st.role === "caregiver" ? "alert to " : "request to "}${people()[st.role]} (${st.outcome})` })));
+    if (a.acked_text) ladder.append(el("li", {}, el("span", { class: "t", text: a.acked_text }), el("span", { text: `Acknowledged via ${a.ack_source}` })));
+    const msgs = el("details", { class: "msgs" }, el("summary", { text: `Messages sent (${a.notifications.length})` }));
+    for (const n of a.notifications) msgs.append(el("p", { text: `${n.time}, ${n.channel} to ${n.role} (${n.status}): ${n.text}` }));
+    box.append(el("article", { class: "alert" }, head,
+      el("p", { class: "message", text: a.explanation || "Preparing the explanation…" }), why, ladder,
+      el("p", { class: "source", text: a.explanation_source === "bedrock" ? "Wording by an Amazon Bedrock model, checked by CareLoop's validator. The decision itself is statistical." : "Wording from CareLoop's fixed template. The decision itself is statistical." }),
+      msgs));
+  }
+}
+
+/* ---------- audit ---------- */
+function renderAudit(entries) {
+  const body = $("audit"); body.replaceChildren();
+  if (!entries.length) { body.append(el("tr", {}, el("td", { colspan: 3, class: "empty", text: "Nothing recorded yet." }))); return; }
+  for (const e of entries) body.append(el("tr", {}, el("td", { class: "when", text: e.time }), el("td", { class: "action", text: e.action.replaceAll(".", ".\u200b") }), el("td", { text: `${e.reason}: ${e.outcome}` })));
+}
+
+/* ---------- ring health ---------- */
+async function refreshRing() {
+  try {
+    const r = await api("/api/ring/health");
+    $("ring-dot").classList.toggle("on", r.connected);
+    $("ring-text").textContent = r.connected ? r.message : `Ring API not connected: ${r.message}`;
+  } catch (e) { $("ring-text").textContent = "Ring status unavailable"; }
+}
+
+/* ---------- demo ---------- */
+async function setupDemo() {
+  const d = await api("/api/demo/state");
+  state.demoEnabled = d.enabled;
+  $("demo").hidden = !d.enabled; $("demo-banner").hidden = !d.enabled;
+  if (!d.enabled) return;
+  const box = $("scenarios"); box.replaceChildren();
+  const names = { "missed-morning": "Run missed morning", "late-but-normal": "Run late but normal", "elder-replies": "Run elder replies", "camera-offline": "Run camera offline" };
+  for (const [key, text] of Object.entries(d.scenarios)) {
+    const b = el("button", { type: "button", "data-s": key }, el("span", { text: names[key] || key }), el("small", { text }));
+    b.addEventListener("click", () => demoAction(`/api/demo/run`, { scenario: key, speed: Number($("speed").value) }, `Running ${key}`));
+    box.append(b);
+  }
+  $("btn-seed").addEventListener("click", () => demoAction("/api/demo/seed", null, "Seeded 28 days of synthetic history"));
+  $("btn-reset").addEventListener("click", () => demoAction("/api/demo/reset", null, "Reset"));
+  renderDemo(d);
+}
+async function demoAction(path, body, message) {
+  if (state.busy) return;
+  state.busy = true;
+  document.querySelectorAll("#demo button").forEach(b => b.disabled = true);
+  try {
+    await api(path, { method: "POST", headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : null });
+    toast(message);
+  } catch (e) { toast(e.message); }
+  state.busy = false;
+  document.querySelectorAll("#demo button").forEach(b => b.disabled = false);
+  $("fp-day").value = ""; state.fpDate = null;
+  refresh();
+}
+function renderDemo(d) {
+  $("demo-banner-detail").textContent = d.scenario ? ` · ${d.scenario}${d.finished ? " (finished)" : " (running)"}` : "";
+  const log = $("demo-log"); log.replaceChildren();
+  for (const l of d.log) log.append(el("li", {}, el("span", { class: "t", text: l.time }), el("span", { text: l.text })));
+}
+
+/* ---------- refresh loop ---------- */
+async function refreshBaseline() {
+  try { renderFingerprint(await api(`/api/baseline${state.fpDate ? `?date=${state.fpDate}` : ""}`)); } catch (e) { $("fp-chart").replaceChildren(el("p", { class: "empty", text: `Couldn't load the routine: ${e.message}` })); }
+}
+async function refresh() {
+  try {
+    const s = await api("/api/status");
+    renderStatus(s); fillWeekdays(s.now.slice(0, 10));
+  } catch (e) {
+    $("status").dataset.tone = "degraded";
+    $("status-label").textContent = "Not connected";
+    $("status-headline").textContent = "The dashboard can't reach CareLoop.";
+    $("status-detail").textContent = `${e.message}. Check that the server is running, then this page updates by itself.`;
+    return;
+  }
+  const jobs = [
+    refreshBaseline(),
+    api("/api/timeline").then(renderTimeline).catch(() => {}),
+    api("/api/anomalies").then(r => renderAlerts(r.anomalies)).catch(() => {}),
+    api("/api/audit?limit=60").then(r => renderAudit(r.entries)).catch(() => {}),
+  ];
+  if (state.demoEnabled) jobs.push(api("/api/demo/state").then(renderDemo).catch(() => {}));
+  await Promise.all(jobs);
+}
+(async function start() {
+  await setupDemo().catch(() => {});
+  await refresh();
+  refreshRing();
+  setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+  let resizeTimer;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => {
+    if (state.lastBaseline) renderFingerprint(state.lastBaseline);
+    if (state.lastTimeline) renderTimeline(state.lastTimeline);
+  }, 150); });
+  setInterval(() => { if (!document.hidden) refreshRing(); }, 60000);
+  setInterval(() => { if (!document.hidden && state.status && state.status.clock_speed > 1) refresh(); }, 1500);
+})();
+</script>
 </body>
 </html>

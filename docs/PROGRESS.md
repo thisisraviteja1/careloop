@@ -80,3 +80,13 @@
 - `scripts/demo_scenario.py` and `make demo-cli SCENARIO=…`; `make demo` starts the dashboard in demo mode.
 - End-to-end tests for all four scenarios plus the API.
 - Measured: `missed-morning` at speed 60 runs from start to EXHAUSTED in 95 real seconds (with Bedrock fallbacks; real Bedrock adds a few seconds).
+
+## Phase 6: dashboard
+
+**Done**
+- `frontend/index.html`: one file, vanilla JS and inline SVG, polling every 5 s (every 1.5 s while the demo clock runs).
+- Status card (icon + word + colour, `aria-live="polite"`, headline of 24 px or more), last seen, threshold, ladder level, "I'm handling it" button.
+- Routine fingerprint: one row per past same-weekday morning on a 5:30 to 10:30 AM axis over a dawn gradient, with the usual window shaded, a dashed threshold line, and today's row (a dot, or a growing "no one yet" line). Each chart has a text alternative.
+- "Why this alert" numbers beside every alert explanation, the ladder steps, and the messages sent.
+- Today's timeline, the privacy and audit table, the Ring connection indicator (live `users_me`), and the demo panel under the required banner.
+- Atkinson Hyperlegible (a typeface designed for low-vision readers), WCAG AA colours in light and dark modes, 44 px minimum targets, visible focus, reduced motion respected. Charts are drawn at the container's real pixel width, so text stays 13 px on phones and at 200% zoom; no horizontal scrolling at 390 px.

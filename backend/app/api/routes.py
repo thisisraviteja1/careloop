@@ -102,6 +102,9 @@ def get_status(request: Request) -> dict[str, Any]:
             "status": status, "label": label, "icon": icon, "reason": result.decision.reason,
             "now": now.isoformat(), "now_text": clock_time(now),
             "person_name": svc.settings.person_name,
+            "people": {"elder": svc.settings.person_name,
+                       "caregiver": svc.settings.caregiver_name,
+                       "neighbor": svc.settings.neighbor_name},
             "last_seen": local(last_seen, svc),
             "last_seen_text": last_seen_phrase(last_seen, now) if last_seen else None,
             "threshold_text": clock_time(result.decision.threshold_at)
