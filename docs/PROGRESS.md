@@ -90,3 +90,12 @@
 - "Why this alert" numbers beside every alert explanation, the ladder steps, and the messages sent.
 - Today's timeline, the privacy and audit table, the Ring connection indicator (live `users_me`), and the demo panel under the required banner.
 - Atkinson Hyperlegible (a typeface designed for low-vision readers), WCAG AA colours in light and dark modes, 44 px minimum targets, visible focus, reduced motion respected. Charts are drawn at the container's real pixel width, so text stays 13 px on phones and at 200% zoom; no horizontal scrolling at 390 px.
+
+## Phase 7: evaluation against fixed timers
+
+**Done**
+- `scripts/evaluate.py`: deterministic 90-day histories for two people (an early riser around 7:00 and a late riser around 8:40) at three morning-variability levels, with naturally late mornings and 8 injected incident days. CareLoop is judged with the production `compute_baseline` and `evaluate` on past data only; fixed timers at 8, 9 and 10 AM run on the same days.
+- Outputs `docs/evaluation.md`, `docs/evaluation.csv` and `docs/evaluation.png` (validated colour-blind-safe palette, shared scales, direct labels). The caveat is printed and written on every output.
+- Tests: determinism, no future-data leakage, identical code path, shared judged days.
+
+**Result (reported as is, no tuning):** across all six settings CareLoop never exceeds 4 of 61 false alarms (7%), with median delays of 54–105 minutes. Every fixed timer fails somewhere: 8 AM alerts on 61 of 61 normal days for the late riser, 9 AM on up to 36%, and 10 AM waits 180 minutes for the early riser. For the early riser alone, an 8 AM timer is about as good as CareLoop and faster. The honest claim is "no tuning needed", not "always faster".

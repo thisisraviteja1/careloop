@@ -1,0 +1,25 @@
+persona,variability,sd_minutes,method,false_alarms,normal_days,false_alarms_per_100_days,missed_incidents,incidents,median_delay_min,max_delay_min
+Early riser (about 7:00 AM),low,8,CareLoop baseline,3,61,4.9,0,8,54,84
+Early riser (about 7:00 AM),low,8,Fixed timer 8:00 AM,3,61,4.9,0,8,60,60
+Early riser (about 7:00 AM),low,8,Fixed timer 9:00 AM,0,61,0.0,0,8,120,120
+Early riser (about 7:00 AM),low,8,Fixed timer 10:00 AM,0,61,0.0,0,8,180,180
+Early riser (about 7:00 AM),medium,15,CareLoop baseline,2,61,3.3,0,8,82,126
+Early riser (about 7:00 AM),medium,15,Fixed timer 8:00 AM,3,61,4.9,0,8,60,60
+Early riser (about 7:00 AM),medium,15,Fixed timer 9:00 AM,0,61,0.0,0,8,120,120
+Early riser (about 7:00 AM),medium,15,Fixed timer 10:00 AM,0,61,0.0,0,8,180,180
+Early riser (about 7:00 AM),high,25,CareLoop baseline,3,61,4.9,0,8,105,119
+Early riser (about 7:00 AM),high,25,Fixed timer 8:00 AM,4,61,6.6,0,8,60,60
+Early riser (about 7:00 AM),high,25,Fixed timer 9:00 AM,0,61,0.0,0,8,120,120
+Early riser (about 7:00 AM),high,25,Fixed timer 10:00 AM,0,61,0.0,0,8,180,180
+Late riser (about 8:40 AM),low,8,CareLoop baseline,4,61,6.6,0,8,78,116
+Late riser (about 8:40 AM),low,8,Fixed timer 8:00 AM,61,61,100.0,0,8,-40,-40
+Late riser (about 8:40 AM),low,8,Fixed timer 9:00 AM,20,61,32.8,0,8,20,20
+Late riser (about 8:40 AM),low,8,Fixed timer 10:00 AM,2,61,3.3,0,8,80,80
+Late riser (about 8:40 AM),medium,15,CareLoop baseline,1,61,1.6,0,8,59,71
+Late riser (about 8:40 AM),medium,15,Fixed timer 8:00 AM,61,61,100.0,0,8,-40,-40
+Late riser (about 8:40 AM),medium,15,Fixed timer 9:00 AM,20,61,32.8,0,8,20,20
+Late riser (about 8:40 AM),medium,15,Fixed timer 10:00 AM,0,61,0.0,0,8,80,80
+Late riser (about 8:40 AM),high,25,CareLoop baseline,3,61,4.9,0,8,84,105
+Late riser (about 8:40 AM),high,25,Fixed timer 8:00 AM,59,61,96.7,0,8,-40,-40
+Late riser (about 8:40 AM),high,25,Fixed timer 9:00 AM,22,61,36.1,0,8,20,20
+Late riser (about 8:40 AM),high,25,Fixed timer 10:00 AM,5,61,8.2,0,8,80,80
