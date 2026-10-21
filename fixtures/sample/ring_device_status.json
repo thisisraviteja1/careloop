@@ -1,0 +1,10 @@
+{
+  "_comment": "SYNTHETIC sample written by hand for fixture mode. Not a real Ring response. Replace with the scrubbed output of scripts/ring_probe.py.",
+  "data": {
+    "id": "device-1",
+    "type": "device_status",
+    "attributes": {
+      "online": true
+    }
+  }
+}

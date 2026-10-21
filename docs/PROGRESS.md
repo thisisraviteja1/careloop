@@ -20,3 +20,16 @@
 - Real event type names: docs say `motion_detected` + `sub_type: human` and `button_press`; the hello-world script suggests `motion.human` and `ding`. The probe output settles it.
 - Event history pagination and time-range query params are not documented on the page we could read. Check the probe's `links` / `meta` output.
 - Snapshot request body (the `components` array) is still unconfirmed.
+
+## Phase 1: clock, database, Ring client, poller
+
+**Done**
+- `core/clock.py`: one time source with a speed multiplier, `set_time`, `advance`, and freeze (speed 0).
+- `db/`: SQLModel tables `Event`, `Anomaly`, `EscalationStep`, `NotificationLog`, `AuditLog`, `DeviceHealth`. All datetimes use our own `UTCDateTime` column type (aware in, aware UTC out), so behaviour doesn't change between SQLModel releases.
+- `ring/client.py`: `live` and `fixture` modes; 10 s timeout, one retry on network or 5xx errors, no retry on 4xx; 401 raises "Ring token expired, regenerate in Playground". Snapshot returns bytes only when the response is an image, otherwise `None`.
+- `ring/events.py`: parses event history; activity = human motion or doorbell press, accepting both documented spellings until the real probe confirms one.
+- `ring/poller.py`: `sync_once` with a cursor (newest stored event), de-duplication by Ring ID, and device health tracking. `python -m app.ring.poller --once` works in fixture mode.
+- `fixtures/sample/`: hand-written synthetic responses (labelled) so fixture mode works before the probe runs.
+
+**Open questions**
+- Event history has no documented time filter, so the client filters after fetching and follows `links.next` for up to 10 pages. Revisit once the probe shows real paging.

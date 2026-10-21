@@ -1,0 +1,12 @@
+{
+  "_comment": "SYNTHETIC sample written by hand for fixture mode. Not a real Ring response. Replace with the scrubbed output of scripts/ring_probe.py.",
+  "data": {
+    "id": "user-1",
+    "type": "users",
+    "attributes": {
+      "first_name": "REDACTED",
+      "last_name": "REDACTED",
+      "email": "REDACTED"
+    }
+  }
+}
