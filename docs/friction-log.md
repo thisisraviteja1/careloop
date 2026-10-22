@@ -60,6 +60,14 @@ Every real tooling problem, written down when it happens. Format: task, steps ta
 - **Workaround:** CareLoop declares its own `UTCDateTime` column type, so behaviour is the same on old and new SQLModel releases.
 - **Suggestion:** none for the hackathon tools; recorded because it cost time.
 
+### 8. The "simulator" demo requirement doesn't say which simulator to use
+- **Task:** plan a demo video that meets the Ring track rule "the demo video must show the project working through a simulator or an actual Ring device".
+- **Steps:** read the hackathon Resources page and the Ring docs links on it, looking for a named Ring simulator; then searched the FAQ.
+- **Expected vs. actual:** expected the Resources page to name and link the simulator. It names none. Only the FAQ says "a simulator (like the Ring Developer Playground)".
+- **Severity:** med (teams without a Ring device can't tell whether their demo will pass the pass/fail review)
+- **Workaround:** used the Ring Developer Playground token for live API calls in the demo.
+- **Suggestion:** state on the Ring track and Resources pages that the Developer Playground is the simulator, link to it, and say what a Playground token can see (virtual devices, simulated events, snapshots).
+
 ---
 
 **Still to log by the team (needs real credentials):** the Playground token flow, the first real `make probe` run (device list, event names), Bedrock model access and inference-profile IDs (`scripts/check_bedrock.py`), the snapshot request body, and the Telegram bot setup. Write each one down as it happens, with the exact error text.
