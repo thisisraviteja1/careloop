@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import httpx
 
 from app.config import REPO_ROOT
+from app.core import clock
 from app.ring.events import RingEvent, parse_events
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ class RingClient:
             raise RingAuthError()
         self.mode = mode
         self.fixtures_dir = fixtures_dir
+        self._transport = transport
         self._http: httpx.Client | None = None
         if mode == "live":
             self._http = httpx.Client(
@@ -109,12 +111,20 @@ class RingClient:
             events = [e for e in events if e.ts > since]
         return sorted(events, key=lambda e: e.ts)
 
-    def get_snapshot(self, device_id: str, components: list[str] | None = None) -> bytes | None:
-        """A still image from the camera, or None if unavailable. Bytes are never stored."""
+    def get_snapshot(self, device_id: str, at: datetime | None = None) -> bytes | None:
+        """A still image from the camera at `at` (default: 5 s ago), or None if unavailable.
+
+        Verified against the Ring Developer Playground: the body is
+        {"type": "at_timestamp", "timestamp": <epoch ms>} (the other type is
+        "latest_in_range" with start_timestamp/end_timestamp), the API answers 303 with the
+        image location, and the media host answers 416 MEDIA_NOT_FOUND when the camera
+        recorded nothing at that moment. Bytes are kept in memory only.
+        """
         if self.mode == "fixture":
             path = self.fixtures_dir / "demo_snapshot.jpg"
             return path.read_bytes() if path.is_file() else None
-        payload: dict[str, Any] = {"components": components} if components else {}
+        moment = at or clock.now() - timedelta(seconds=5)
+        payload = {"type": "at_timestamp", "timestamp": int(moment.timestamp() * 1000)}
         try:
             response = self._request("POST", f"/v1/devices/{device_id}/media/image/download",
                                      json=payload)
@@ -123,9 +133,23 @@ class RingClient:
         except RingError as exc:
             logger.warning("snapshot unavailable: %s", exc)
             return None
-        if not response.headers.get("content-type", "").startswith("image/"):
-            logger.warning("snapshot response was %s, not an image",
-                           response.headers.get("content-type"))
+        if response.status_code in (301, 302, 303, 307, 308):
+            location = response.headers.get("location", "")
+            if not location:
+                return None
+            # The media host is a different origin: never forward the Ring token to it.
+            try:
+                with httpx.Client(timeout=TIMEOUT_SECONDS, transport=self._transport) as plain:
+                    response = plain.get(location)
+            except httpx.HTTPError as exc:
+                logger.warning("snapshot download failed: %s", exc.__class__.__name__)
+                return None
+            if response.status_code >= 400:
+                logger.info("no snapshot at that moment (HTTP %s)", response.status_code)
+                return None
+        content_type = response.headers.get("content-type", "")
+        if not (content_type.startswith("image/") or response.content[:3] == b"\xff\xd8\xff"):
+            logger.warning("snapshot response was %s, not an image", content_type)
             return None
         return response.content
 

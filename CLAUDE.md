@@ -102,3 +102,8 @@ Verified from the official docs. **Response shapes are NOT verified. Read the do
 - Users/me: `data.id` is the account ID; attributes may include name and email (scrubbed in fixtures).
 - Snapshot: `POST /v1/devices/{id}/media/image/download` returns JPEG or PNG. Body shape still unconfirmed; the docs mention a `components` array for multi-camera devices.
 - Computer Vision Guidelines: treat imagery as sensitive, keep processing in-region and retention short, send only selected still frames, treat VLM output as unverified, check every model text output, define fallback behaviour, expect unreadable media on encrypted (E2EE) devices without retrying.
+
+## Verified with the Ring Developer Playground (Oct 23, 2026)
+- `users/me`, `devices`, `devices/{id}/status` work; the Playground has one "Playground Device" (Doorbell Pro), `online: true`.
+- Event history returns `{"data": []}` for the Playground device (no sample events).
+- Snapshot body: `{"type": "at_timestamp", "timestamp": <epoch ms>}` (or `latest_in_range` with `start_timestamp`/`end_timestamp`, inside the token's authorized window). Response: 303 to a media host; 416 `MEDIA_NOT_FOUND` when nothing was recorded.

@@ -76,6 +76,22 @@ Every real tooling problem, written down when it happens. Format: task, steps ta
 - **Workaround:** built a deterministic template fallback for every model call, and validated the Bedrock requests with botocore's Stubber.
 - **Suggestion:** offer hackathon participants a short-lived sandbox AWS account or Bedrock playground credentials with Nova enabled, so the AWS Builder track doesn't depend on personal card verification.
 
+### 10. The snapshot request body had to be discovered from error messages
+- **Task:** download one image snapshot from the Playground doorbell (`POST /v1/devices/{id}/media/image/download`).
+- **Steps:** with a Playground token, sent `{}` → 403 "missing required timestamp fields"; `{"timestamp": <ms>}` → 400 "type is required"; `{"type": "image", ...}` → 400 "valid values: at_timestamp, latest_in_range"; `{"type": "at_timestamp", "timestamp": <ms>}` → 303 to a media host, which answered 416 MEDIA_NOT_FOUND. `latest_in_range` → 403 "time range is not within authorized boundaries" when the range started before the token was issued.
+- **Expected vs. actual:** expected the API reference to document the body, the 303 redirect, and the authorized time range. None of it appears there; seven requests were needed. The Playground device also has no recorded media or events, so a snapshot could not be retrieved at all.
+- **Severity:** high (snapshot verification is the core of computer-vision integrations)
+- **Workaround:** implemented the verified body and redirect handling in `ring/client.py` and the contributed `image_snapshot.py`; demo uses a fixture image.
+- **Suggestion:** document the body, both types, the 303 flow and the authorized window in the Image Snapshots section; give the Playground doorbell a few sample recordings and events so media and event-history APIs return data.
+
+### 11. Playground token can't see any events
+- **Task:** read human-motion and doorbell-press events to learn a routine.
+- **Steps:** `GET /v1/history/devices/{id}/events` without a filter and with `event_types=motion_detected`, `button_press`, `live_view`.
+- **Expected vs. actual:** expected sample events on the Playground doorbell; every call returned `{"data": []}`. So the real event names (docs vs. sample disagree, see #3) still can't be confirmed.
+- **Severity:** med
+- **Workaround:** the demo uses labelled synthetic history; the parser accepts both documented spellings.
+- **Suggestion:** seed the Playground account with a day of synthetic motion, ding and live-view events.
+
 ---
 
 **Still to log by the team (needs real credentials):** the Playground token flow, the first real `make probe` run (device list, event names), Bedrock model access and inference-profile IDs (`scripts/check_bedrock.py`), the snapshot request body, and the Telegram bot setup. Write each one down as it happens, with the exact error text.

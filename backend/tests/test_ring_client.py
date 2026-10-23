@@ -137,3 +137,30 @@ def test_timestamp_formats() -> None:
 def test_unreadable_items_are_skipped() -> None:
     body = {"data": [{"id": "x", "attributes": {}}, {"attributes": {"start": "2026-10-21"}}]}
     assert parse_events(body, "d1") == []
+
+
+def test_snapshot_follows_redirect_without_leaking_the_token() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.host == "api.amazonvision.com":
+            return httpx.Response(303, headers={"location": "https://download.example.dev/m/1"})
+        return httpx.Response(200, content=b"\xff\xd8\xffimg",
+                              headers={"content-type": "image/jpeg"})
+
+    at = datetime(2026, 10, 23, 7, 38, 20, tzinfo=UTC)
+    assert live(handler).get_snapshot("d1", at=at) == b"\xff\xd8\xffimg"
+    import json as _json
+    assert _json.loads(seen[0].content) == {"type": "at_timestamp",
+                                            "timestamp": int(at.timestamp() * 1000)}
+    assert "authorization" not in seen[1].headers
+
+
+def test_snapshot_media_not_found_is_none() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "api.amazonvision.com":
+            return httpx.Response(303, headers={"location": "https://download.example.dev/m/1"})
+        return httpx.Response(416, json={"errors": [{"code": "MEDIA_NOT_FOUND"}]})
+
+    assert live(handler).get_snapshot("d1") is None
