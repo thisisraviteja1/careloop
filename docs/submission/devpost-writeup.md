@@ -40,7 +40,7 @@ Every snapshot, model call, message and acknowledgement is listed in a privacy a
 - **Documentation gaps.** Event type names differ between the Ring docs (`motion_detected` with `sub_type: human`) and the official sample (`motion.human`, `ding`), and the event history endpoint documents no time-range or paging parameters. We wrote a probe that saves scrubbed real responses, and made the parser accept both spellings. These are logged in our friction log.
 - **Not alarming people.** The hard part was not detection but wording: no diagnosis, no "fall", no "emergency", hedged camera descriptions, and a fixed order that a worried person can scan in five seconds.
 - **A dead camera must never look like a missing person.** The device health guard was the most important "boring" feature.
-- [AWS account sign-up: add one sentence about what happened, if it's still relevant.]
+- **AWS access.** We couldn't get into an AWS account before the deadline, so the demo video runs CareLoop's deterministic fallback: "camera image unavailable" and the fixed message template. The Bedrock integration is fully built, and our tests validate every Converse request against the real Bedrock API schema, but it has not been run against live models. Building the fallback first meant the product still works end to end without AI.
 
 ## Accomplishments that we're proud of
 
@@ -74,7 +74,7 @@ Every snapshot, model call, message and acknowledgement is listed in a privacy a
 
 ## AWS services (for the Product Feedback answer)
 
-CareLoop uses **Amazon Bedrock Runtime's Converse API** with **Amazon Nova Lite** twice per anomaly. The first call sends one Ring snapshot as an image block, with a fixed prompt, to describe the doorway in 25 words or fewer. The second sends only a facts JSON and that description, to phrase the caregiver message, with an optional **Amazon Bedrock Guardrail** (denied topic: medical diagnosis; word filter for alarming words). Every call has 10-second timeouts, one retry, and an audit-log row with token counts. Every output is checked by our own validator, and a deterministic template is the fallback. `scripts/check_bedrock.py` uses the Bedrock control plane (`list_foundation_models`, `list_inference_profiles`) to diagnose access. [Add a sentence about what it was like to set up, once the keys work.]
+CareLoop uses **Amazon Bedrock Runtime's Converse API** with **Amazon Nova Lite** twice per anomaly. The first call sends one Ring snapshot as an image block, with a fixed prompt, to describe the doorway in 25 words or fewer. The second sends only a facts JSON and that description, to phrase the caregiver message, with an optional **Amazon Bedrock Guardrail** (denied topic: medical diagnosis; word filter for alarming words). Every call has 10-second timeouts, one retry, and an audit-log row with token counts. Every output is checked by our own validator, and a deterministic template is the fallback. `scripts/check_bedrock.py` uses the Bedrock control plane (`list_foundation_models`, `list_inference_profiles`) to diagnose access. Honest status: we couldn't sign in to an AWS account in time, so these calls were validated with botocore's Stubber against the real API schema but not run against live models, and the demo shows the deterministic fallback.
 
 ## Open Source mini challenge
 

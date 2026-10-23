@@ -26,7 +26,7 @@ Click **Run missed morning**.
 > "This is her own routine: on Wednesdays she's usually at the door between 6:52 and 7:11. The alert threshold is that window plus 45 minutes, not a fixed timer."
 
 *Screen:* the chart, pausing one second on the dashed threshold line.
-> "7:56 and no one has been seen. Before worrying anyone, CareLoop takes one snapshot and asks Amazon Bedrock what it shows."
+> "7:56 and no one has been seen. Before worrying anyone, CareLoop takes one snapshot to describe with Amazon Bedrock. In this recording Bedrock isn't connected, so CareLoop falls back to its fixed, safe wording: it never stalls without the AI."
 
 *Screen:* the status card turns to Escalating, with the camera line.
 > "First, it asks Lakshmi herself."

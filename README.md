@@ -142,6 +142,7 @@ All calls are in [`backend/app/ring/client.py`](backend/app/ring/client.py) (ser
 - **Event shapes.** Event type names differ between the Ring docs and the official sample (see [docs/friction-log.md](docs/friction-log.md)); CareLoop accepts both until confirmed against real responses with `make probe`.
 - **Polling and in-process timers.** One asyncio loop; no webhooks, no job queue, no persistence of timers across restarts beyond what is in SQLite.
 - **One household, one person, one doorbell.** Two anomalies: late start (A1) and long silence (A2). A2 messages always use the deterministic template, and A2 is not part of the evaluation.
+- **Bedrock not run live yet.** We couldn't get AWS account access before the deadline. The Bedrock integration is built and its requests are schema-validated in tests, but the demo video shows the deterministic fallback ("camera image unavailable", template wording).
 - **Guardrails cover text only.** The Bedrock Guardrail is attached to the explainer's text call; the vision description is checked by the local validator.
 - **Not a medical device** and not an emergency service.
 

@@ -68,6 +68,14 @@ Every real tooling problem, written down when it happens. Format: task, steps ta
 - **Workaround:** used the Ring Developer Playground token for live API calls in the demo.
 - **Suggestion:** state on the Ring track and Resources pages that the Developer Playground is the simulator, link to it, and say what a Playground token can see (virtual devices, simulated events, snapshots).
 
+### 9. Couldn't get into an AWS account in time to enable Bedrock
+- **Task:** sign in to the AWS console to enable Amazon Nova Lite in Bedrock and create an access key (two days before the deadline).
+- **Steps:** started AWS account sign-up from India, then tried to sign in to the console over two days.
+- **Expected vs. actual:** expected a working account within an hour. Sign-up and then sign-in kept failing, and the hackathon's AWS credit codes had run out on Oct 7, so there was no alternative route.
+- **Severity:** high (live Bedrock calls never ran; the demo uses the deterministic fallback)
+- **Workaround:** built a deterministic template fallback for every model call, and validated the Bedrock requests with botocore's Stubber.
+- **Suggestion:** offer hackathon participants a short-lived sandbox AWS account or Bedrock playground credentials with Nova enabled, so the AWS Builder track doesn't depend on personal card verification.
+
 ---
 
 **Still to log by the team (needs real credentials):** the Playground token flow, the first real `make probe` run (device list, event names), Bedrock model access and inference-profile IDs (`scripts/check_bedrock.py`), the snapshot request body, and the Telegram bot setup. Write each one down as it happens, with the exact error text.
