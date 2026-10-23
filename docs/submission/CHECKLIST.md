@@ -6,11 +6,11 @@ Judging (equal weight): Tech Implementation · Design · Potential Impact · Qua
 
 | Item | Where | Status |
 |---|---|---|
-| Ring token in `.env`; `make probe` works | `.env`, `fixtures/ring_*.json` | ☐ |
+| Ring token in `.env`; `make probe` works | `.env`, `fixtures/ring_*.json` | ☑ |
 | Video shows the Ring Developer Playground (simulator) | `docs/submission/video-script.md` | ☐ |
 | AWS keys in `.env`; `scripts/check_bedrock.py` all ✓ | `.env` | ☐ |
-| Public GitHub repo with LICENSE, pushed | github.com/thisisraviteja1/careloop | ☐ |
-| Open-source PR opened (tested with a real token) | `contrib/ring-api-helloworld/` | ☐ |
+| Public GitHub repo with LICENSE, pushed | github.com/thisisraviteja1/careloop | ☑ |
+| Open-source PR opened | https://github.com/AmazonAppDev/ring-api-helloworld/pull/46 | ☑ |
 | Friction log, 8+ entries | `docs/friction-log.md` | ☐ (8 now; add real Ring/AWS ones) |
 | Product feedback for Ring, Bedrock, Telegram, MCP | `docs/product-feedback.md` | ☐ fill in the "to complete" parts |
 | Write-up pasted into Devpost | `docs/submission/devpost-writeup.md` | ☐ fill in the [brackets] |
