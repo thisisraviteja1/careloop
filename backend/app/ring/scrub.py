@@ -42,6 +42,8 @@ SENSITIVE_KEYS = {
 SECRET_KEY_PATTERN = re.compile(r"token|secret|password|signature|credential|api_key", re.I)
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 URL_QUERY_PATTERN = re.compile(r"(https?://[^\s\"?]+)\?[^\s\"]*")
+# Ring's opaque IDs, e.g. "ava1.ring.device.2EUF4Z44...", also appear inside link URLs.
+RING_ID_PATTERN = re.compile(r"ava1\.ring\.([a-z.]+?)\.([A-Z0-9]{16,})")
 # Keys holding identifiers we replace with stable pseudonyms so fixtures stay consistent.
 ID_KEYS = {"id", "device_id", "account_id", "user_id", "location_id", "event_id"}
 
@@ -80,9 +82,10 @@ class Scrubber:
             return self.pseudonym(str(value), kind)
         return self.scrub(value, parent_type=node_type)
 
-    @staticmethod
-    def _scrub_string(value: str) -> str:
+    def _scrub_string(self, value: str) -> str:
         value = EMAIL_PATTERN.sub("user@example.com", value)
+        value = RING_ID_PATTERN.sub(
+            lambda m: self.pseudonym(m.group(0), _kind(m.group(1).split(".")[-1])), value)
         return URL_QUERY_PATTERN.sub(r"\1?REDACTED", value)
 
 

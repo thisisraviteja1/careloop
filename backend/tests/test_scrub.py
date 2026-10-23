@@ -62,3 +62,12 @@ def test_event_attributes_are_kept() -> None:
                                                              "start": "2026-10-21T07:02:00Z"}}
     attrs = Scrubber().scrub({"data": [event]})["data"][0]["attributes"]
     assert attrs == event["attributes"]
+
+
+def test_ring_ids_inside_links_use_the_same_pseudonym() -> None:
+    real = "ava1.ring.device.2EUF4Z443LGDBCPFVAJECYFL3WWEYM3G"
+    body = {"data": [{"id": real, "type": "devices",
+                      "links": {"related": f"/v1/devices/{real}/status"}}]}
+    out = json.dumps(Scrubber().scrub(body))
+    assert "2EUF4Z44" not in out
+    assert '"/v1/devices/device-1/status"' in out
