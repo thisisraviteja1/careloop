@@ -104,7 +104,10 @@ def test_snapshot_returns_image_bytes_only() -> None:
 
 
 def test_fixture_mode_reads_sample_files(tmp_path: Path) -> None:
-    client = RingClient("fixture")
+    # Only the synthetic samples: the real Playground fixtures have no events.
+    import shutil
+    shutil.copytree(Path(__file__).parents[2] / "fixtures" / "sample", tmp_path / "sample")
+    client = RingClient("fixture", fixtures_dir=tmp_path)
     assert client.first_device_id() == "device-1"
     events = client.get_events("device-1")
     assert len(events) == 4
