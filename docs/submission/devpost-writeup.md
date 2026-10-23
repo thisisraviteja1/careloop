@@ -79,8 +79,8 @@ CareLoop uses **Amazon Bedrock Runtime's Converse API** with **Amazon Nova Lite*
 ## Open Source mini challenge
 
 - **Contribution URL:** [PR or fork URL]
-- **Project repository:** https://github.com/Bharath0408/careloop
-- **GitHub username:** Bharath0408
+- **Project repository:** https://github.com/thisisraviteja1/careloop
+- **GitHub username:** thisisraviteja1
 - **What, how and why:** The official `ring-api-helloworld` starter has a script for every read endpoint except image snapshots. We added `scripts/image_snapshot.py` in the same style: argparse, `--token`, device auto-discovery, and a printed curl equivalent. It calls `POST /v1/devices/{id}/media/image/download`, supports `--components` for multi-camera devices, checks that the response is an image before saving, and prints the error body otherwise. It matters because snapshots are the step every computer-vision integration needs first, and it is the one endpoint new developers currently have no example for.
 
 ## Built during the submission period
